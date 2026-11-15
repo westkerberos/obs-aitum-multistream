@@ -1143,11 +1143,22 @@ QWidget *OutputDialog::WizardInfoVerticalTikTok(bool edit)
 		validateOutputs(confirmButton);
 	};
 
-	connect(configureButton, &QPushButton::clicked, this, [this, outputNameField, updateMethod] {
-		outputName = outputNameField->text();
-		if (ConfigureVerticalTikTok(this))
-			updateMethod();
-	});
+	connect(configureButton, &QPushButton::clicked, this,
+		 [this, outputNameField, serverSelection, outputKeyField, updateMethod] {
+			outputName = outputNameField->text();
+			const QString oldMethod = tiktokSettings
+				? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method")) : QString();
+			if (ConfigureVerticalTikTok(this)) {
+				const QString newMethod = tiktokSettings
+					? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method")) : QString();
+				if ((newMethod.isEmpty() || newMethod == "custom") &&
+					!oldMethod.isEmpty() && oldMethod != "custom") {
+					serverSelection->clear();
+					outputKeyField->clear();
+				}
+				updateMethod();
+			}
+		});
 
 	connect(confirmButton, &QPushButton::clicked, [this, outputNameField, serverSelection, outputKeyField] {
 		outputName = outputNameField->text();
@@ -1172,6 +1183,16 @@ QWidget *OutputDialog::WizardInfoVerticalTikTok(bool edit)
 
 	if (edit) {
 		outputNameField->setText(outputName);
+	} else {
+		connect(stackedWidget, &QStackedWidget::currentChanged, this,
+			[this, outputNameField, serverSelection, outputKeyField, updateMethod](int index) {
+				if (index == 7) {
+					outputName = outputNameField->text();
+					outputServer = serverSelection->text();
+					outputKey = outputKeyField->text();
+					updateMethod();
+				}
+			});
 	}
 	updateMethod();
 	return page;
