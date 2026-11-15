@@ -21,6 +21,8 @@ jobs:
   build-project:
     name: Build Project 🧱
     uses: ./.github/workflows/build-project.yaml
+    with:
+      windowsOnly: true
     secrets: inherit
     permissions:
       contents: read
