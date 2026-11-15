@@ -990,8 +990,6 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 			if (!settings)
 				return;
 
-			if (outputs == vertical_outputs)
-				obs_data_set_bool(settings, "enabled", true);
 			// Apply provider-specific fields first. The temporary settings object
 			// also contains the existing destination name and endpoint, so write the
 			// edited destination fields after applying it.
@@ -1000,6 +998,8 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 					obs_data_apply(settings, outputDialog->TikTokSettings());
 				obs_data_set_bool(settings, "tiktok_target", true);
 			}
+			if (outputs == vertical_outputs)
+				obs_data_set_bool(settings, "enabled", true);
 			obs_data_set_string(settings, "name", outputDialog->outputName.toUtf8().constData());
 			obs_data_set_string(settings, "stream_server", outputDialog->outputServer.toUtf8().constData());
 			obs_data_set_string(settings, "stream_key", outputDialog->outputKey.toUtf8().constData());
