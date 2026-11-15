@@ -1096,8 +1096,11 @@ QWidget *OutputDialog::WizardInfoVerticalTikTok(bool edit)
 	configureButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
 	auto methodSummary = new QLabel;
 	methodSummary->setWordWrap(true);
+	auto connectionInfo = new QLabel;
+	connectionInfo->setWordWrap(true);
 	formLayout->addRow(QString(), configureButton);
 	formLayout->addRow(QString(), methodSummary);
+	formLayout->addRow(QString(), connectionInfo);
 
 	auto serverSelection = generateOutputServerField(confirmButton, false, edit);
 	auto serverRow = new QWidget(page);
@@ -1124,7 +1127,7 @@ QWidget *OutputDialog::WizardInfoVerticalTikTok(bool edit)
 		if (method == "streamlabs") return QString("Streamlabs Desktop");
 		return QString("Custom RTMP / stream key");
 	};
-	auto updateMethod = [this, methodSummary, serverRow, serverInfo, keyRow, keyInfo, serverSelection, outputKeyField, confirmButton, methodName] {
+	auto updateMethod = [this, methodSummary, connectionInfo, serverRow, serverInfo, keyRow, keyInfo, serverSelection, outputKeyField, confirmButton, methodName] {
 		const QString method = tiktokSettings ? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method")) : QString();
 		const bool custom = method.isEmpty() || method == "custom";
 		serverRow->setVisible(custom);
@@ -1143,6 +1146,9 @@ QWidget *OutputDialog::WizardInfoVerticalTikTok(bool edit)
 		const bool configured = tiktokSettings && obs_data_has_user_value(tiktokSettings, "tiktok_method");
 		methodSummary->setText(configured ? QString("Connection: %1").arg(methodName()) :
 			QString("Choose a connection method. Custom RTMP can be entered below."));
+		connectionInfo->setText(custom
+			? QString("For Custom RTMP, enter the server and stream key supplied by your provider.")
+			: QString("The provider will supply a fresh RTMP server and stream key when this Vertical Canvas output starts. You do not need to paste them here."));
 		validateOutputs(confirmButton);
 	};
 
