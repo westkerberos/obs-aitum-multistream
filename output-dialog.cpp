@@ -303,7 +303,7 @@ OutputDialog::OutputDialog(QDialog *parent, QStringList _otherNames, bool _verti
 	//
 	setModal(true);
 	setContentsMargins(0, 0, 0, 0);
-	setFixedSize(650, 400);
+	setFixedSize(650, verticalCanvasTarget ? 480 : 400);
 
 	stackedWidget = new QStackedWidget;
 
@@ -416,7 +416,8 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 OutputDialog::~OutputDialog()
 {
 	obs_data_array_release(servicesData);
-	obs_data_release(tiktokSettings);
+	if (tiktokSettings)
+		obs_data_release(tiktokSettings);
 }
 
 QWidget *OutputDialog::WizardServicePage()
