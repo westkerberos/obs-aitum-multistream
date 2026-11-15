@@ -673,7 +673,9 @@ void MultistreamDock::LoadOutput(obs_data_t *output_data, bool vertical)
 
 	auto endpoint = QString::fromUtf8(obs_data_get_string(output_data, "stream_server"));
 	auto platformIconLabel = new QLabel;
-	auto platformIcon = ConfigUtils::getPlatformIconFromEndpoint(endpoint);
+	const bool nativeTikTok = vertical && obs_data_get_bool(output_data, "tiktok_target");
+	auto platformIcon = nativeTikTok ? QIcon(":/aitum/media/tiktok.png") :
+		ConfigUtils::getPlatformIconFromEndpoint(endpoint);
 
 	platformIconLabel->setPixmap(platformIcon.pixmap(outputPlatformIconSize, outputPlatformIconSize));
 
