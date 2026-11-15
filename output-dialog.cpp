@@ -369,7 +369,8 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 		tiktokTarget = obs_data_get_bool(tiktokSettings, "tiktok_target") ||
 			obs_data_has_user_value(tiktokSettings, "tiktok_method") ||
 			server.contains("tiktokcdn-", Qt::CaseInsensitive) ||
-			server.contains("tiktok", Qt::CaseInsensitive);
+			server.contains("tiktok", Qt::CaseInsensitive) ||
+			name.contains("tiktok", Qt::CaseInsensitive);
 	}
 
 	//
@@ -1075,9 +1076,10 @@ QWidget *OutputDialog::WizardInfoVerticalTikTok(bool edit)
 
 	auto pageLayout = new QVBoxLayout;
 	pageLayout->setSpacing(12);
-	auto title = new QLabel(QString::fromUtf8(obs_module_text(edit ? "TikTokServiceInfoEdit" : "TikTokServiceInfo")));
+	auto title = new QLabel(edit
+		? "Edit this TikTok destination for Vertical Canvas. Choose how it connects below."
+		: "Add a TikTok destination for Vertical Canvas. Choose TikTok LIVE Studio Desktop or Mobile, Streamlabs Desktop, or Custom RTMP.");
 	title->setWordWrap(true);
-	title->setTextFormat(Qt::RichText);
 	pageLayout->addWidget(title);
 
 	auto formLayout = new QFormLayout;
