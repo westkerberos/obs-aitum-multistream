@@ -1106,7 +1106,11 @@ QWidget *OutputDialog::WizardInfoVerticalTikTok(bool edit)
 	formLayout->addRow(QString(), serverInfo);
 
 	auto outputKeyField = generateOutputKeyField(confirmButton, edit);
-	formLayout->addRow(generateFormLabel("TikTokStreamKey"), outputKeyField);
+	auto keyRow = new QWidget(page);
+	auto keyRowLayout = new QVBoxLayout(keyRow);
+	keyRowLayout->setContentsMargins(0, 0, 0, 0);
+	keyRowLayout->addWidget(outputKeyField);
+	formLayout->addRow(generateFormLabel("TikTokStreamKey"), keyRow);
 	auto keyInfo = generateInfoLabel("TikTokStreamKeyInfo");
 	formLayout->addRow(QString(), keyInfo);
 
@@ -1117,17 +1121,17 @@ QWidget *OutputDialog::WizardInfoVerticalTikTok(bool edit)
 		if (method == "streamlabs") return QString("Streamlabs Desktop");
 		return QString("Custom RTMP / stream key");
 	};
-	auto updateMethod = [this, methodSummary, serverRow, serverInfo, outputKeyField, keyInfo, serverSelection, confirmButton, methodName] {
+	auto updateMethod = [this, methodSummary, serverRow, serverInfo, keyRow, keyInfo, serverSelection, outputKeyField, confirmButton, methodName] {
 		const QString method = tiktokSettings ? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method")) : QString();
 		const bool custom = method.isEmpty() || method == "custom";
 		serverRow->setVisible(custom);
 		serverInfo->setVisible(custom);
-		outputKeyField->parentWidget()->setVisible(custom);
+		keyRow->setVisible(custom);
 		keyInfo->setVisible(custom);
 		if (!custom) {
 			outputServer = "rtmp://placeholder.invalid/live";
 			outputKey = "pending";
-			serverSelection->setText(QString::fromStdString(outputServer.toStdString()));
+			serverSelection->setText(outputServer);
 			outputKeyField->setText(outputKey);
 		} else {
 			outputServer = serverSelection->text();
