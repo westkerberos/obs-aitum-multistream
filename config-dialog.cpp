@@ -229,7 +229,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 			&otherNames);
 		obs_data_array_release(main_outputs);
 		otherNames.removeDuplicates();
-		auto outputDialog = new OutputDialog(this, otherNames, true);
+		auto outputDialog = new OutputDialog(this, otherNames);
 
 		outputDialog->setWindowModality(Qt::WindowModal);
 		outputDialog->setModal(true);
@@ -325,7 +325,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 			},
 			&otherNames);
 		otherNames.removeDuplicates();
-		auto outputDialog = new OutputDialog(this, otherNames);
+		auto outputDialog = new OutputDialog(this, otherNames, true);
 
 		outputDialog->setWindowModality(Qt::WindowModal);
 		outputDialog->setModal(true);
