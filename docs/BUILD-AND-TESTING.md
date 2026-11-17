@@ -30,10 +30,10 @@ The repository uses the upstream Aitum build/package workflow adapted for this f
 
 Latest Windows x64 build/package, including the companion requirement and license notice, passed:
 
-- Workflow: [#44159148944](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44159148944)
-- Commit: `455c0bf95e72de242cd66cc942f94c2788b3a80f`
-- Artifact: `aitum-multistream-1.0.9-windows-x64-ddb120a0c`
-- The latest Actions artifact is available from the linked workflow run. The previously inspected standard ZIP included `data/obs-plugins/aitum-multistream/licenses/GPL-2.0.txt`; verify the current artifact contents again before publishing a release.
+- Workflow: [#44162614334](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44162614334)
+- Commit: `abf4f9848b221a8c560d31e09c319c1970f9d73a`
+- Artifact: `aitum-multistream-1.0.9-windows-x64-1a5d88e83`
+- The previously inspected standard ZIP included `data/obs-plugins/aitum-multistream/licenses/GPL-2.0.txt`; verify the latest artifact contents again before publishing a release.
 - Signing: skipped because the signing secrets are not configured.
 - Linux/macOS: not built by this fork's workflow.
 
