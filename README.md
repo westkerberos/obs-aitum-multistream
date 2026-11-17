@@ -10,7 +10,7 @@ This repository is the Multistream-side configuration bridge. It is **not** the 
 
 Use this project if you already use **Aitum Multistream together with Vertical Canvas** and want TikTok to appear as a named Vertical Canvas destination in the Multistream settings/dock workflow.
 
-Do not install this plugin by itself expecting a working TikTok integration. The matching WEST Gaming [obs-vertical-canvas](https://github.com/westkerberos/obs-vertical-canvas) plugin is required and owns the entire TikTok runtime. This bridge also does not add TikTok as the ordinary OBS Main Canvas streaming provider; use [obs-multi-rtmp](https://github.com/westkerberos/obs-multi-rtmp) for the separate standalone implementation.
+Do not install this plugin by itself expecting a working TikTok integration. The matching WEST Gaming [obs-vertical-canvas](https://github.com/westkerberos/obs-vertical-canvas) plugin is required and owns the entire TikTok runtime. This bridge does not add TikTok as the ordinary OBS Main Canvas streaming provider; it is specifically for Vertical Canvas destinations.
 
 ## What this fork adds
 
