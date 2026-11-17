@@ -76,7 +76,7 @@ Do not install this fork by itself expecting it to add standalone TikTok support
 
 - Both plugins must be installed and loaded in OBS.
 - The Multistream bridge PR builds Windows x64. macOS and Linux jobs are intentionally skipped in this fork's workflow.
-- The latest bridge PR head `455c0bf95e72de242cd66cc942f94c2788b3a80f` built and packaged successfully for Windows x64 in [GitHub Actions run #44159148944](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44159148944). The artifact is `aitum-multistream-1.0.9-windows-x64-ddb120a0c`.
+- The latest verified bridge build and artifact are listed in [Build and testing](docs/BUILD-AND-TESTING.md).
 - The matching Vertical Canvas runtime has its own build and test status. A green Multistream build does not prove the TikTok API/runtime is available; see [Vertical Canvas build/testing notes](https://github.com/westkerberos/obs-vertical-canvas/blob/feature/tiktok-native-output/docs/BUILD-AND-TESTING.md).
 - There is no GitHub Release published for this repository yet. CI artifacts are test packages, not a stable release channel.
 - Unsigned Windows test packages are expected while signing secrets are unavailable.
