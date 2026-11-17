@@ -28,14 +28,20 @@ The repository uses the upstream Aitum build/package workflow adapted for this f
 
 ## CI and package status
 
-Latest Windows x64 build/package, including the companion requirement and license notice, passed:
+The latest PR head built and packaged successfully for Windows x64:
 
-- Workflow: [#44164183646](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44164183646)
-- Commit: `71c9dda444407bd62720411ebbb1f12387f03783`
-- Artifact: `aitum-multistream-1.0.9-windows-x64-74e7f1c88`
-- The previously inspected standard ZIP included `data/obs-plugins/aitum-multistream/licenses/GPL-2.0.txt`; verify the latest artifact contents again before publishing a release.
+- Workflow: [#44164817168](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44164817168)
+- Commit: `c4232a895c21daf503ddae9fe002dfa3caa3e1bc`
+- Artifact: `aitum-multistream-1.0.9-windows-x64-8ffd6bdbd`
+- Windows build job: success.
+- GitHub event-data validation: success.
+- Ubuntu/macOS build jobs: skipped by this fork's workflow.
+- Formatting jobs: skipped by the workflow configuration.
 - Signing: skipped because the signing secrets are not configured.
-- Linux/macOS: not built by this fork's workflow.
+
+This is a CI test package, not a GitHub Release or a stable distribution channel. The latest artifact should be inspected again for its license files before any public binary distribution.
+
+There is no GitHub Release published for this repository yet.
 
 ## What this build proves
 
