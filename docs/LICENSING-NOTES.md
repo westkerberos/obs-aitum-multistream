@@ -8,4 +8,4 @@ Do not present this bridge as a standalone TikTok runtime. Keep the upstream Ait
 
 ## Windows package verification
 
-The latest Windows x64 artifact is produced by workflow [#44159148944](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44159148944), commit `455c0bf95e72de242cd66cc942f94c2788b3a80f`, artifact `aitum-multistream-1.0.9-windows-x64-ddb120a0c`. The previous standard ZIP was inspected and contained the main license text at `data/obs-plugins/aitum-multistream/licenses/GPL-2.0.txt`. Re-inspect the latest artifact's file list before publishing a release.
+The latest Windows x64 artifact is produced by workflow [#44162614334](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44162614334), commit `abf4f9848b221a8c560d31e09c319c1970f9d73a`, artifact `aitum-multistream-1.0.9-windows-x64-1a5d88e83`. The previously inspected standard ZIP was confirmed to contain the main license text at `data/obs-plugins/aitum-multistream/licenses/GPL-2.0.txt`. Re-inspect the latest artifact's file list before publishing a release.
