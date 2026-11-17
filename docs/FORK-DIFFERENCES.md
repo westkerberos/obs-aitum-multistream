@@ -53,6 +53,14 @@ The PR touches the following areas:
 
 The TikTok session, UI, output and safety code is intentionally not copied into this repository.
 
+## Exact upstream scope
+
+The fork is based on [Aitum/obs-aitum-multistream](https://github.com/Aitum/obs-aitum-multistream). As of 17 November 2026, the WEST Gaming PR contains **11 changed files, 479 additions and 35 deletions** relative to this fork's `main`.
+
+The source-code additions are intentionally small compared with the Vertical Canvas TikTok implementation. The key changes are the Vertical Canvas-aware target creation/edit path in `config-dialog.cpp`, TikTok wizard and proc-handler bridge in `output-dialog.cpp/.hpp`, and TikTok target identification in `multistream.cpp`, plus Windows-only workflow configuration and this documentation.
+
+A comparison against Aitum's upstream `main` shows 20 commits ahead and 0 behind for the feature branch; that count includes the branch's inherited commit history. The PR file list is the more useful measure of the actual Multistream bridge change.
+
 ## Build and test status
 
 The bridge PR's Windows x64 build and package passed at commit `f72dec7f09cbba53dff1f669f9df1737cfef3eed`: [Actions run #43772925061](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/43772925061).
