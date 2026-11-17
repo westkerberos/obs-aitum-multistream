@@ -63,7 +63,7 @@ A comparison against Aitum's upstream `main` shows the feature branch ahead and 
 
 ## Build and test status
 
-The latest bridge PR head `455c0bf95e72de242cd66cc942f94c2788b3a80f` built and packaged successfully for Windows x64 in [GitHub Actions run #44159148944](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44159148944). The artifact is `aitum-multistream-1.0.9-windows-x64-ddb120a0c`.
+The latest verified Windows x64 bridge build and artifact are recorded in [Build and verification](BUILD-AND-TESTING.md).
 
 A separate successful Multistream build is not proof of the Vertical Canvas runtime. The latter must be installed and tested as a paired component. The matching Vertical Canvas PR and current runtime/build notes are linked from the [main README](../README.md).
 
