@@ -4,7 +4,7 @@ A WEST Gaming-maintained fork of [Aitum Multistream](https://github.com/Aitum/ob
 
 This repository is the Multistream-side configuration bridge. It is **not** the TikTok account/session/signing implementation. Those responsibilities live in the matching [WEST Gaming Vertical Canvas fork](https://github.com/westkerberos/obs-vertical-canvas).
 
-> **Development status — 17 November 2026:** the TikTok destination integration is in [PR #1](https://github.com/westkerberos/obs-aitum-multistream/pull/1), branch `feature/tiktok-vertical-target`. The default `main` branch does not contain these changes until the PR is merged. There is no GitHub Release for this fork yet.
+> **Development status — 17 November 2026:** the TikTok destination integration is in [PR #1](https://github.com/westkerberos/obs-aitum-multistream/pull/1), branch `feature/tiktok-vertical-target`. The default `main` branch does not contain these changes until the PR is merged. The matching Vertical Canvas runtime still has an unresolved GPL-2 / GPL-3.0-only compatibility issue; see its [licensing review](https://github.com/westkerberos/obs-vertical-canvas/blob/feature/tiktok-native-output/docs/LICENSING-NOTES.md). Do not publish a combined paired release until that issue is resolved. There is no GitHub Release for this fork yet.
 
 ## Who should use this fork
 
