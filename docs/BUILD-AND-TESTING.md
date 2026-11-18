@@ -28,7 +28,7 @@ The repository uses the upstream Aitum build/package workflow adapted for this f
 
 ## CI and package status
 
-The latest PR head built and packaged successfully for Windows x64:
+The latest successful Windows x64 package workflow for this bridge ran at commit `1bdf53586f50617d5f52c09d56393dff2376935a`. The branch head now contains later documentation-only commits; the bridge implementation is unchanged:
 
 - Workflow: [#44179729479](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44179729479)
 - Commit: `1bdf53586f50617d5f52c09d56393dff2376935a`
