@@ -13,6 +13,8 @@
 #include <QLineEdit>
 #include <QSizePolicy>
 #include "obs-module.h"
+#include <obs.h>
+#include <QMessageBox>
 #include "util/platform.h"
 #include "stream-key-input.hpp"
 
@@ -36,13 +38,15 @@ void OutputDialog::validateOutputs(QPushButton *confirmButton)
 
 	if (outputName.isEmpty() || otherNames.contains(outputName)) {
 		confirmButton->setEnabled(false);
-	} else if (outputServer.isEmpty()) {
-		confirmButton->setEnabled(false);
-	} else if (outputKey.isEmpty()) {
-		confirmButton->setEnabled(false);
-	} else {
-		confirmButton->setEnabled(true);
+		return;
 	}
+
+	const QString method = tiktokSettings
+		? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method"))
+		: QString();
+	const bool dynamicTikTok = verticalCanvasTarget && tiktokTarget &&
+		!method.isEmpty() && method != "custom";
+	confirmButton->setEnabled(dynamicTikTok || (!outputServer.isEmpty() && !outputKey.isEmpty()));
 }
 
 // Helper for generating info QLabels
@@ -250,7 +254,11 @@ QToolButton *OutputDialog::selectionButton(std::string title, QIcon icon, int se
 	button->setStyleSheet(
 		"min-width: 110px; max-width: 110px; min-height: 90px; max-height: 90px; padding-top: 16px; font-weight: bold;");
 
-	connect(button, &QPushButton::clicked, [this, selectionStep] { stackedWidget->setCurrentIndex(selectionStep); });
+	connect(button, &QPushButton::clicked, [this, selectionStep] {
+		if (verticalCanvasTarget)
+			tiktokTarget = selectionStep == 7;
+		stackedWidget->setCurrentIndex(selectionStep);
+	});
 
 	return button;
 }
@@ -272,7 +280,8 @@ obs_data_t *OutputDialog::getService(std::string serviceName)
 	return nullptr;
 }
 
-OutputDialog::OutputDialog(QDialog *parent, QStringList _otherNames) : QDialog(parent), otherNames(_otherNames)
+OutputDialog::OutputDialog(QDialog *parent, QStringList _otherNames, bool _verticalCanvasTarget)
+	: QDialog(parent), otherNames(_otherNames), verticalCanvasTarget(_verticalCanvasTarget)
 {
 	// Load the services from rtmp-services plugin
 	auto servicesPath = obs_module_get_config_path(obs_get_module("rtmp-services"), "services.json");
@@ -287,11 +296,14 @@ OutputDialog::OutputDialog(QDialog *parent, QStringList _otherNames) : QDialog(p
 
 	// Blank info
 	resetOutputs();
+	if (verticalCanvasTarget) {
+		tiktokSettings = obs_data_create();
+	}
 
 	//
 	setModal(true);
 	setContentsMargins(0, 0, 0, 0);
-	setFixedSize(650, 400);
+	setFixedSize(650, verticalCanvasTarget ? 480 : 400);
 
 	stackedWidget = new QStackedWidget;
 
@@ -324,9 +336,11 @@ OutputDialog::OutputDialog(QDialog *parent, QStringList _otherNames) : QDialog(p
 }
 
 // Edit mode
-OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QString key, QStringList _otherNames)
+OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QString key, QStringList _otherNames,
+				   bool _verticalCanvasTarget, obs_data_t *existingSettings)
 	: QDialog(parent),
-	  otherNames(_otherNames)
+	  otherNames(_otherNames),
+	  verticalCanvasTarget(_verticalCanvasTarget)
 {
 
 	// Load the services from rtmp-services plugin
@@ -348,6 +362,16 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 	outputName = name;
 	outputServer = server;
 	outputKey = key;
+	if (verticalCanvasTarget) {
+		tiktokSettings = obs_data_create();
+		if (existingSettings)
+			obs_data_apply(tiktokSettings, existingSettings);
+		tiktokTarget = obs_data_get_bool(tiktokSettings, "tiktok_target") ||
+			obs_data_has_user_value(tiktokSettings, "tiktok_method") ||
+			server.contains("tiktokcdn-", Qt::CaseInsensitive) ||
+			server.contains("tiktok", Qt::CaseInsensitive) ||
+			name.contains("tiktok", Qt::CaseInsensitive);
+	}
 
 	//
 	setModal(true);
@@ -356,8 +380,12 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 
 	auto layout = new QVBoxLayout();
 
-	// Add the appropriate page to the layout based upon the server url
-	if (outputServer.contains(QString::fromUtf8("ingest.global-contribute.live-video.net")) ||
+	// Add the appropriate page to the layout based upon the server URL.
+	// A native TikTok target can use a placeholder RTMP URL, so identify it from
+	// the settings marker rather than trying to infer its provider from the URL.
+	if (verticalCanvasTarget && tiktokTarget) {
+		layout->addWidget(WizardInfoTikTok(true));
+	} else if (outputServer.contains(QString::fromUtf8("ingest.global-contribute.live-video.net")) ||
 	    outputServer.contains(QString::fromUtf8(".contribute.live-video.net")) ||
 	    outputServer.contains(QString::fromUtf8(".twitch.tv"))) { // twitch
 		layout->addWidget(WizardInfoTwitch(true));
@@ -388,6 +416,8 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 OutputDialog::~OutputDialog()
 {
 	obs_data_array_release(servicesData);
+	if (tiktokSettings)
+		obs_data_release(tiktokSettings);
 }
 
 QWidget *OutputDialog::WizardServicePage()
@@ -927,8 +957,39 @@ QWidget *OutputDialog::WizardInfoTrovo(bool edit)
 	return page;
 }
 
+bool OutputDialog::ConfigureVerticalTikTok(QWidget *parent)
+{
+	if (!verticalCanvasTarget || !tiktokSettings)
+		return false;
+
+	auto *handler = obs_get_proc_handler();
+	if (!handler) {
+		QMessageBox::warning(parent, "TikTok", "Aitum Vertical Canvas is not available.");
+		return false;
+	}
+
+	calldata_t cd;
+	calldata_init(&cd);
+	const QByteArray outputNameBytes = outputName.toUtf8();
+	calldata_set_ptr(&cd, "parent", parent);
+	calldata_set_ptr(&cd, "settings", tiktokSettings);
+	calldata_set_string(&cd, "name", outputNameBytes.constData());
+	const bool called = proc_handler_call(handler, "aitum_vertical_configure_tiktok_output", &cd);
+	const bool accepted = called && calldata_bool(&cd, "accepted");
+	calldata_free(&cd);
+
+	if (!called) {
+		QMessageBox::warning(parent, "TikTok",
+			"Aitum Vertical Canvas is outdated or does not expose the TikTok configuration dialog. Update Vertical Canvas first.");
+	}
+	return accepted;
+}
+
 QWidget *OutputDialog::WizardInfoTikTok(bool edit)
 {
+	if (verticalCanvasTarget)
+		return WizardInfoVerticalTikTok(edit);
+
 	auto page = new QWidget(this);
 	page->setStyleSheet("padding: 0px; margin: 0px;");
 
@@ -1006,6 +1067,143 @@ QWidget *OutputDialog::WizardInfoTikTok(bool edit)
 			});
 	}
 
+	return page;
+}
+
+QWidget *OutputDialog::WizardInfoVerticalTikTok(bool edit)
+{
+	auto page = new QWidget(this);
+	page->setStyleSheet("padding: 0px; margin: 0px;");
+
+	auto pageLayout = new QVBoxLayout;
+	pageLayout->setSpacing(12);
+	auto title = new QLabel(edit
+		? "Edit this TikTok destination for Vertical Canvas. Choose how it connects below."
+		: "Add a TikTok destination for Vertical Canvas. Choose TikTok LIVE Studio Desktop or Mobile, Streamlabs Desktop, or Custom RTMP.");
+	title->setWordWrap(true);
+	pageLayout->addWidget(title);
+
+	auto formLayout = new QFormLayout;
+	formLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
+	formLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+	formLayout->setSpacing(12);
+
+	auto confirmButton = generateButton(QString(obs_module_text(edit ? "SaveOutput" : "CreateOutput")));
+	auto outputNameField = generateOutputNameField("TikTokOutput", confirmButton, edit);
+	formLayout->addRow(generateFormLabel("OutputName"), outputNameField);
+
+	auto configureButton = generateButton("Configure TikTok connection…");
+	configureButton->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	auto methodSummary = new QLabel;
+	methodSummary->setWordWrap(true);
+	auto connectionInfo = new QLabel;
+	connectionInfo->setWordWrap(true);
+	formLayout->addRow(QString(), configureButton);
+	formLayout->addRow(QString(), methodSummary);
+	formLayout->addRow(QString(), connectionInfo);
+
+	auto serverSelection = generateOutputServerField(confirmButton, false, edit);
+	auto serverRow = new QWidget(page);
+	auto serverLayout = new QVBoxLayout(serverRow);
+	serverLayout->setContentsMargins(0, 0, 0, 0);
+	serverLayout->addWidget(serverSelection);
+	formLayout->addRow(generateFormLabel("TikTokServer"), serverRow);
+	auto serverInfo = generateInfoLabel("TikTokServerInfo");
+	formLayout->addRow(QString(), serverInfo);
+
+	auto outputKeyField = generateOutputKeyField(confirmButton, edit);
+	auto keyRow = new QWidget(page);
+	auto keyRowLayout = new QVBoxLayout(keyRow);
+	keyRowLayout->setContentsMargins(0, 0, 0, 0);
+	keyRowLayout->addWidget(outputKeyField);
+	formLayout->addRow(generateFormLabel("TikTokStreamKey"), keyRow);
+	auto keyInfo = generateInfoLabel("TikTokStreamKeyInfo");
+	formLayout->addRow(QString(), keyInfo);
+
+	auto methodName = [this] {
+		const QString method = tiktokSettings ? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method")) : QString();
+		if (method == "live-studio") return QString("TikTok LIVE Studio — Desktop");
+		if (method == "live-studio-mobile") return QString("TikTok LIVE Studio — Mobile");
+		if (method == "streamlabs") return QString("Streamlabs Desktop");
+		return QString("Custom RTMP / stream key");
+	};
+	auto updateMethod = [this, methodSummary, connectionInfo, serverRow, serverInfo, keyRow, keyInfo, serverSelection, outputKeyField, confirmButton, methodName] {
+		const QString method = tiktokSettings ? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method")) : QString();
+		const bool custom = method.isEmpty() || method == "custom";
+		serverRow->setVisible(custom);
+		serverInfo->setVisible(custom);
+		keyRow->setVisible(custom);
+		keyInfo->setVisible(custom);
+		if (!custom) {
+			outputServer = "rtmp://placeholder.invalid/live";
+			outputKey = "pending";
+			serverSelection->setText(outputServer);
+			outputKeyField->setText(outputKey);
+		} else {
+			outputServer = serverSelection->text();
+			outputKey = outputKeyField->text();
+		}
+		const bool configured = tiktokSettings && obs_data_has_user_value(tiktokSettings, "tiktok_method");
+		methodSummary->setText(configured ? QString("Connection: %1").arg(methodName()) :
+			QString("Choose a connection method. Custom RTMP can be entered below."));
+		connectionInfo->setText(custom
+			? QString("For Custom RTMP, enter the server and stream key supplied by your provider.")
+			: QString("The provider will supply a fresh RTMP server and stream key when this Vertical Canvas output starts. You do not need to paste them here."));
+		validateOutputs(confirmButton);
+	};
+
+	connect(configureButton, &QPushButton::clicked, this,
+		 [this, outputNameField, serverSelection, outputKeyField, updateMethod] {
+			outputName = outputNameField->text();
+			const QString oldMethod = tiktokSettings
+				? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method")) : QString();
+			if (ConfigureVerticalTikTok(this)) {
+				const QString newMethod = tiktokSettings
+					? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method")) : QString();
+				if ((newMethod.isEmpty() || newMethod == "custom") &&
+					!oldMethod.isEmpty() && oldMethod != "custom") {
+					serverSelection->clear();
+					outputKeyField->clear();
+				}
+				updateMethod();
+			}
+		});
+
+	connect(confirmButton, &QPushButton::clicked, [this, outputNameField, serverSelection, outputKeyField] {
+		outputName = outputNameField->text();
+		const QString method = tiktokSettings ? QString::fromUtf8(obs_data_get_string(tiktokSettings, "tiktok_method")) : QString();
+		if (method.isEmpty() || method == "custom") {
+			outputServer = serverSelection->text();
+			outputKey = outputKeyField->text();
+		} else {
+			outputServer = "rtmp://placeholder.invalid/live";
+			outputKey = "pending";
+		}
+		acceptOutputs();
+	});
+
+	pageLayout->addLayout(formLayout);
+	pageLayout->addStretch(1);
+
+	auto serviceButton = edit ? nullptr : generateBackButton();
+	auto controlsLayout = generateWizardButtonLayout(confirmButton, serviceButton, edit);
+	pageLayout->addLayout(controlsLayout);
+	page->setLayout(pageLayout);
+
+	if (edit) {
+		outputNameField->setText(outputName);
+	} else {
+		connect(stackedWidget, &QStackedWidget::currentChanged, this,
+			[this, outputNameField, serverSelection, outputKeyField, updateMethod](int index) {
+				if (index == 7) {
+					outputName = outputNameField->text();
+					outputServer = serverSelection->text();
+					outputKey = outputKeyField->text();
+					updateMethod();
+				}
+			});
+	}
+	updateMethod();
 	return page;
 }
 

@@ -325,7 +325,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 			},
 			&otherNames);
 		otherNames.removeDuplicates();
-		auto outputDialog = new OutputDialog(this, otherNames);
+		auto outputDialog = new OutputDialog(this, otherNames, true);
 
 		outputDialog->setWindowModality(Qt::WindowModal);
 		outputDialog->setModal(true);
@@ -339,6 +339,12 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 			obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
 			obs_data_set_string(s, "stream_server", outputDialog->outputServer.toUtf8().constData());
 			obs_data_set_string(s, "stream_key", outputDialog->outputKey.toUtf8().constData());
+			if (outputDialog->IsVerticalTikTokTarget()) {
+				obs_data_set_bool(s, "tiktok_target", true);
+				if (outputDialog->TikTokSettings())
+					obs_data_apply(s, outputDialog->TikTokSettings());
+				obs_data_set_bool(s, "tiktok_target", true);
+			}
 			obs_data_array_push_back(vertical_outputs, s);
 			AddServer(verticalOutputsLayout, s, vertical_outputs);
 			obs_data_release(s);
@@ -971,9 +977,11 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 			&otherNames);
 		otherNames.removeDuplicates();
 		otherNames.removeOne(QString::fromUtf8(obs_data_get_string(settings, "name")));
+		const bool isVerticalOutput = outputs == vertical_outputs;
 		auto outputDialog = new OutputDialog(this, obs_data_get_string(settings, "name"),
 						     obs_data_get_string(settings, "stream_server"),
-						     obs_data_get_string(settings, "stream_key"), otherNames);
+						     obs_data_get_string(settings, "stream_key"), otherNames,
+						     isVerticalOutput, isVerticalOutput ? settings : nullptr);
 
 		outputDialog->setWindowModality(Qt::WindowModal);
 		outputDialog->setModal(true);
@@ -982,9 +990,16 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 			if (!settings)
 				return;
 
+			// Apply provider-specific fields first. The temporary settings object
+			// also contains the existing destination name and endpoint, so write the
+			// edited destination fields after applying it.
+			if (outputDialog->IsVerticalTikTokTarget()) {
+				if (outputDialog->TikTokSettings())
+					obs_data_apply(settings, outputDialog->TikTokSettings());
+				obs_data_set_bool(settings, "tiktok_target", true);
+			}
 			if (outputs == vertical_outputs)
 				obs_data_set_bool(settings, "enabled", true);
-			// Set the info from the output dialog
 			obs_data_set_string(settings, "name", outputDialog->outputName.toUtf8().constData());
 			obs_data_set_string(settings, "stream_server", outputDialog->outputServer.toUtf8().constData());
 			obs_data_set_string(settings, "stream_key", outputDialog->outputKey.toUtf8().constData());
