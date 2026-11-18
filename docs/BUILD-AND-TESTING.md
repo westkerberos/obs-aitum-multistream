@@ -30,9 +30,10 @@ The repository uses the upstream Aitum build/package workflow adapted for this f
 
 The latest PR head built and packaged successfully for Windows x64:
 
-- Workflow: [#44164817168](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44164817168)
-- Commit: `c4232a895c21daf503ddae9fe002dfa3caa3e1bc`
-- Artifact: `aitum-multistream-1.0.9-windows-x64-8ffd6bdbd`
+- Workflow: [#44179729479](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44179729479)
+- Commit: `1bdf53586f50617d5f52c09d56393dff2376935a`
+- Artifact: `aitum-multistream-1.0.9-windows-x64-a1e8a797e`
+- Artifact SHA-256: `8c0d919e5862e11a026a957b7d4ac21545b2725337d1ec7c106407a1e195ed2c`
 - Windows build job: success.
 - GitHub event-data validation: success.
 - Ubuntu/macOS build jobs: skipped by this fork's workflow.
@@ -47,7 +48,7 @@ There is no GitHub Release published for this repository yet.
 
 A successful Multistream CI run proves that the bridge plugin compiles and packages for the configured Windows x64 target. It does not prove the TikTok LIVE API, cookie session, hosted signing, room creation or Dual LIVE runtime independently; those are implemented in Vertical Canvas.
 
-The repository owner has tested the matching plugin pair in OBS, including the TikTok destination and automatic Dual LIVE workflow. This maintainer test does not establish a broad hardware or OS support matrix.
+On 18 November 2026, the repository owner tested the matching plugin pair in OBS 33.0.1 on Windows for approximately 30 minutes, including Portrait, Landscape and Dual LIVE, with the separate OBS Multi-RTMP plugin disabled. All three modes were reported working. This is a successful maintainer smoke test on one setup, not a broad hardware or OS support matrix. The companion Vertical Canvas implementation remains subject to source-license remediation; this bridge build does not establish release clearance.
 
 ## Release checklist
 
