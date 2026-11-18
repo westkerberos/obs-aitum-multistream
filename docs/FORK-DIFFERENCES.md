@@ -67,4 +67,4 @@ The latest verified Windows x64 bridge build and artifact are recorded in [Build
 
 A separate successful Multistream build is not proof of the Vertical Canvas runtime. The latter must be installed and tested as a paired component. The matching Vertical Canvas PR and current runtime/build notes are linked from the [main README](../README.md).
 
-This repository has no GitHub Release as of 17 November 2026. The feature branch must be merged and a release package created before the integration can be presented as a stable public release.
+This repository has no GitHub Release as of 18 November 2026. The feature branch must be merged and a release package created before the integration can be presented as a stable public release.
