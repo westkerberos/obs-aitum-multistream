@@ -14,6 +14,6 @@ Do not solve this by replacing either Aitum root LICENSE or by removing third-pa
 
 ## Windows package verification
 
-The latest successful Windows x64 bridge build/package is workflow [#44164183646](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44164183646), commit `71c9dda444407bd62720411ebbb1f12387f03783`, artifact `aitum-multistream-1.0.9-windows-x64-74e7f1c88`. The previously inspected standard ZIP was confirmed to contain the main license text at `data/obs-plugins/aitum-multistream/licenses/GPL-2.0.txt`. Re-inspect the latest artifact's file list before publishing any future release.
+The latest successful Windows x64 bridge build/package is workflow [#44179729479](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/44179729479), commit `1bdf53586f50617d5f52c09d56393dff2376935a`, artifact `aitum-multistream-1.0.9-windows-x64-a1e8a797e` (SHA-256 `8c0d919e5862e11a026a957b7d4ac21545b2725337d1ec7c106407a1e195ed2c`). The previously inspected standard ZIP was confirmed to contain the main license text at `data/obs-plugins/aitum-multistream/licenses/GPL-2.0.txt`. Re-inspect the latest artifact's file list before publishing any future release.
 
 This repository has no standalone TikTok runtime and should not be described as a working standalone TikTok integration.
