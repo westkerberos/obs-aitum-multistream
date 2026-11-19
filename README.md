@@ -30,6 +30,10 @@ There is no stable GitHub Release or supported installer for this fork yet. The 
 
 The companion Vertical Canvas development branch has unresolved licensing/provenance remediation. A green Multistream build does not clear or validate the companion TikTok runtime. No combined release should be published until the companion's source audit, architecture, packaging and runtime tests are complete.
 
+## OBS native stream encoder (experimental)
+
+This branch also adds an experimental **OBS Native Stream Encoder** source for Aitum Main Canvas destinations. It allows an Aitum output such as YouTube to reuse OBS's conventional stream encoder instead of selecting one of Twitch Enhanced Broadcasting's negotiated tracks. See [OBS native stream encoder setup and verification](docs/OBS-NATIVE-STREAM-ENCODER.md) for behavior and limitations.
+
 ## Development links
 
 - [TikTok target setup and troubleshooting](https://github.com/westkerberos/obs-aitum-multistream/blob/feature/tiktok-vertical-target/docs/TIKTOK-TARGET.md)
