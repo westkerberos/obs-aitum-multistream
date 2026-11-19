@@ -164,7 +164,29 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 				obs_data_set_int(gpu, "device_id", desc.DeviceId);
 				obs_data_set_int(gpu, "dedicated_video_memory", (long long)desc.DedicatedVideoMemory);
 				obs_data_set_int(gpu, "shared_system_memory", (long long)desc.SharedSystemMemory);
-				obs_data_set_string(gpu, "driver_version", "unknown");
+
+				// Twitch validates this field for Enhanced Broadcasting. Query the
+				// actual UMD driver version through DXGI instead of sending "unknown".
+				LARGE_INTEGER umd = {};
+				const HRESULT driver_result =
+					adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &umd);
+				if (SUCCEEDED(driver_result)) {
+					const uint64_t version = static_cast<uint64_t>(umd.QuadPart);
+					const uint16_t major = static_cast<uint16_t>((version >> 48) & 0xffff);
+					const uint16_t minor = static_cast<uint16_t>((version >> 32) & 0xffff);
+					const uint16_t build = static_cast<uint16_t>((version >> 16) & 0xffff);
+					const uint16_t revision = static_cast<uint16_t>(version & 0xffff);
+					char driver_version[64] = {};
+					snprintf(driver_version, sizeof(driver_version), "%u.%u.%u.%u",
+						 static_cast<unsigned>(major), static_cast<unsigned>(minor),
+						 static_cast<unsigned>(build), static_cast<unsigned>(revision));
+					obs_data_set_string(gpu, "driver_version", driver_version);
+					blog(LOG_INFO, "[Aitum EBC] GPU %s driver version: %s", model, driver_version);
+				} else {
+					blog(LOG_WARNING,
+					     "[Aitum EBC] Could not query DXGI driver version for GPU %s (HRESULT 0x%08lx)",
+					     model, static_cast<unsigned long>(driver_result));
+				}
 				obs_data_array_push_back(gpus, gpu);
 				obs_data_release(gpu);
 			}
