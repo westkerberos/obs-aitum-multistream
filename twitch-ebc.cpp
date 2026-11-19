@@ -118,8 +118,8 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 
 	obs_data_t *capabilities = obs_data_get_obj(root, "capabilities");
 	obs_data_t *cpu = obs_data_get_obj(capabilities, "cpu");
-	const int logical_cores = std::max(1, os_get_logical_cores());
-	const int physical_cores = std::max(1, os_get_physical_cores());
+	const int logical_cores = (std::max)(1, os_get_logical_cores());
+	const int physical_cores = (std::max)(1, os_get_physical_cores());
 	obs_data_set_int(cpu, "logical_cores", logical_cores);
 	obs_data_set_int(cpu, "physical_cores", physical_cores);
 	obs_data_set_string(cpu, "name", "Unknown");
@@ -548,7 +548,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 					const double current_fps = (double)video.fps_num / video.fps_den;
 					const double requested_fps = (double)numerator / denominator;
 					const uint32_t divisor =
-						(uint32_t)std::max(1.0, std::round(current_fps / requested_fps));
+						(uint32_t)(std::max)(1.0, std::round(current_fps / requested_fps));
 					if (divisor > 1)
 						obs_encoder_set_frame_rate_divisor(encoder, divisor);
 				}
