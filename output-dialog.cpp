@@ -839,11 +839,11 @@ QWidget *OutputDialog::WizardInfoTwitch(bool edit)
 	// built-in stream output and any other destination.
 	auto enhancedBroadcasting = new QCheckBox(QString::fromUtf8(obs_module_text("TwitchEnhancedBroadcasting")));
 	enhancedBroadcasting->setChecked(twitchEnhancedBroadcasting);
+	enhancedBroadcasting->setToolTip(QString::fromUtf8(obs_module_text("TwitchEnhancedBroadcastingInfo")));
 	connect(enhancedBroadcasting, &QCheckBox::toggled, [this](bool enabled) {
 		twitchEnhancedBroadcasting = enabled;
 	});
 	formLayout->addRow(QString(), enhancedBroadcasting);
-	formLayout->addWidget(generateInfoLabel("TwitchEnhancedBroadcastingInfo"));
 
 	contentLayout->addLayout(formLayout);
 
