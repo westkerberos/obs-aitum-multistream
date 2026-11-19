@@ -1,5 +1,6 @@
 #include "config-utils.hpp"
 #include "multistream.hpp"
+#include "twitch-ebc.hpp"
 #include "obs-module.h"
 #include "version.h"
 #include <obs-frontend-api.h>
@@ -902,9 +903,65 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 		}
 		obs_output_release(old);
 		obs_service_release(service);
+		enhanced_encoder_groups.erase(std::get<std::string>(*it));
 		outputs.erase(it);
 		break;
 	}
+
+	// Twitch Enhanced Broadcasting is an independent Aitum output. It does not
+	// depend on OBS's built-in stream being active and never changes YouTube.
+	if (obs_data_get_bool(settings, "twitch_enhanced_broadcasting")) {
+		const char *server = obs_data_get_string(settings, "stream_server");
+		if (!server || !server[0]) server = obs_data_get_string(settings, "server");
+		const char *key = obs_data_get_string(settings, "stream_key");
+		if (!key || !key[0]) key = obs_data_get_string(settings, "key");
+		if (!server || !key || !key[0] ||
+		    (strstr(server, "twitch.tv") == nullptr && strstr(server, "contribute.live-video.net") == nullptr)) {
+			QMessageBox::warning(this, QStringLiteral("Twitch Enhanced Broadcasting"),
+					     QStringLiteral("La opción Enhanced Broadcasting requiere una salida de Twitch válida y una clave de transmisión."));
+			return false;
+		}
+
+		obs_output_t *ebc_output = nullptr;
+		TwitchEbcEncoderGroup encoder_group;
+		QString ebc_error;
+		if (!CreateTwitchEnhancedBroadcastingOutput(name, server, key, &ebc_output, encoder_group, ebc_error)) {
+			QMessageBox::warning(this, QStringLiteral("Twitch Enhanced Broadcasting"), ebc_error);
+			return false;
+		}
+
+		config_t *profile_config = obs_frontend_get_profile_config();
+		if (profile_config) {
+			obs_data_t *output_settings = obs_data_create();
+			obs_data_set_string(output_settings, "bind_ip", config_get_string(profile_config, "Output", "BindIP"));
+			obs_data_set_string(output_settings, "ip_family", config_get_string(profile_config, "Output", "IPFamily"));
+			obs_output_update(ebc_output, output_settings);
+			obs_data_release(output_settings);
+
+			const bool use_delay = config_get_bool(profile_config, "Output", "DelayEnable");
+			const uint32_t delay_seconds = (uint32_t)config_get_int(profile_config, "Output", "DelaySec");
+			const bool preserve_delay = config_get_bool(profile_config, "Output", "DelayPreserve");
+			obs_output_set_delay(ebc_output, use_delay ? delay_seconds : 0,
+					     preserve_delay ? OBS_OUTPUT_DELAY_PRESERVE : 0);
+		}
+
+		signal_handler_t *ebc_signal = obs_output_get_signal_handler(ebc_output);
+		signal_handler_connect(ebc_signal, "start", stream_output_start, this);
+		signal_handler_connect(ebc_signal, "stop", stream_output_stop, this);
+		if (!obs_output_start(ebc_output)) {
+			signal_handler_disconnect(ebc_signal, "start", stream_output_start, this);
+			signal_handler_disconnect(ebc_signal, "stop", stream_output_stop, this);
+			obs_output_release(ebc_output);
+			QMessageBox::warning(this, QStringLiteral("Twitch Enhanced Broadcasting"),
+					     QStringLiteral("OBS no pudo iniciar la salida Enhanced Broadcasting de Twitch. Revisa el registro de OBS."));
+			return false;
+		}
+
+		enhanced_encoder_groups[name] = std::move(encoder_group);
+		outputs.push_back({name, ebc_output, streamButton});
+		return true;
+	}
+
 	obs_encoder_t *venc = nullptr;
 	obs_encoder_t *aenc = nullptr;
 	auto advanced = obs_data_get_bool(settings, "advanced");
@@ -1149,8 +1206,14 @@ void MultistreamDock::stream_output_stop(void *data, calldata_t *calldata)
 				},
 				Qt::QueuedConnection);
 		}
+		const std::string output_settings_name = std::get<std::string>(*it);
 		if (!md->exiting) {
-			QMetaObject::invokeMethod(button, [output] { obs_output_release(output); }, Qt::QueuedConnection);
+			QMetaObject::invokeMethod(button, [output, md, output_settings_name] {
+				obs_output_release(output);
+				md->enhanced_encoder_groups.erase(output_settings_name);
+			}, Qt::QueuedConnection);
+		} else {
+			md->enhanced_encoder_groups.erase(output_settings_name);
 		}
 		md->outputs.erase(it);
 		break;
