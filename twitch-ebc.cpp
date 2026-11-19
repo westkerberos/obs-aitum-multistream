@@ -6,6 +6,7 @@
 
 #include <QSysInfo>
 #include <QString>
+#include <QTextDocument>
 #include <QUrl>
 #include <QUrlQuery>
 
@@ -364,11 +365,33 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 	obs_data_t *status = obs_data_get_obj(configuration, "status");
 	if (status) {
 		const char *result = obs_data_get_string(status, "result");
-		if (result && strcmp(result, "error") == 0) {
+		if (result && EqualsCaseInsensitive(result, "error")) {
+			const char *html_detail = obs_data_get_string(status, "html_en_us");
+			QString detail = html_detail ? QString::fromUtf8(html_detail) : QString();
+			if (!detail.isEmpty()) {
+				// Twitch returns this field as HTML. Show a safe plain-text version.
+				QTextDocument document;
+				document.setHtml(detail);
+				detail = document.toPlainText().trimmed();
+			}
 			obs_data_release(status);
 			obs_data_release(configuration);
-			error = QStringLiteral("Twitch rechazó la solicitud de Enhanced Broadcasting por el estado de la cuenta o la configuración del canal.");
+			if (detail.isEmpty()) {
+				error = QStringLiteral("Twitch rechazó Enhanced Broadcasting y no incluyó un motivo en la respuesta.");
+			} else {
+				error = QStringLiteral("Twitch rechazó Enhanced Broadcasting:\n%1").arg(detail);
+			}
+			blog(LOG_ERROR, "[Aitum EBC] Twitch rejected configuration: %s",
+			     detail.toUtf8().constData());
 			return false;
+		}
+		if (result && EqualsCaseInsensitive(result, "warning")) {
+			const char *html_detail = obs_data_get_string(status, "html_en_us");
+			if (html_detail && html_detail[0]) {
+				QTextDocument document;
+				document.setHtml(QString::fromUtf8(html_detail));
+				error = QStringLiteral("Twitch warning: %1").arg(document.toPlainText().trimmed());
+			}
 		}
 		obs_data_release(status);
 	}
