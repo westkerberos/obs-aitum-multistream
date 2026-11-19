@@ -1,5 +1,6 @@
 #include "output-dialog.hpp"
 
+#include <QCheckBox>
 #include <QDialog>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
