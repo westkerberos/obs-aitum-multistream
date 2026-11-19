@@ -249,6 +249,7 @@ OBSBasicSettings::OBSBasicSettings(QMainWindow *parent) : QDialog(parent)
 			obs_data_set_string(s, "name", outputDialog->outputName.toUtf8().constData());
 			obs_data_set_string(s, "stream_server", outputDialog->outputServer.toUtf8().constData());
 			obs_data_set_string(s, "stream_key", outputDialog->outputKey.toUtf8().constData());
+			obs_data_set_bool(s, "twitch_enhanced_broadcasting", outputDialog->TwitchEnhancedBroadcastingEnabled());
 
 			obs_data_array_push_back(outputs, s);
 			AddServer(mainOutputsLayout, s, outputs);
@@ -981,7 +982,7 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 		auto outputDialog = new OutputDialog(this, obs_data_get_string(settings, "name"),
 						     obs_data_get_string(settings, "stream_server"),
 						     obs_data_get_string(settings, "stream_key"), otherNames,
-						     isVerticalOutput, isVerticalOutput ? settings : nullptr);
+						     isVerticalOutput, settings);
 
 		outputDialog->setWindowModality(Qt::WindowModal);
 		outputDialog->setModal(true);
@@ -1003,6 +1004,7 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 			obs_data_set_string(settings, "name", outputDialog->outputName.toUtf8().constData());
 			obs_data_set_string(settings, "stream_server", outputDialog->outputServer.toUtf8().constData());
 			obs_data_set_string(settings, "stream_key", outputDialog->outputKey.toUtf8().constData());
+			obs_data_set_bool(settings, "twitch_enhanced_broadcasting", outputDialog->TwitchEnhancedBroadcastingEnabled());
 
 			// Reload
 			LoadSettings(main_settings);
