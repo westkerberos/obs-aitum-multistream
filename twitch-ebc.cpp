@@ -167,9 +167,17 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 #endif
 	obs_data_release(capabilities);
 
+	obs_data_t *preferences = obs_data_get_obj(root, "preferences");
+	obs_audio_info2 audio_info = {};
+	if (obs_get_audio_info2(&audio_info)) {
+		obs_data_set_int(preferences, "audio_samples_per_sec", audio_info.samples_per_sec);
+		obs_data_set_int(preferences, "audio_channels", get_audio_channels(audio_info.speakers));
+		obs_data_set_bool(preferences, "audio_fixed_buffering", audio_info.fixed_buffering);
+		obs_data_set_int(preferences, "audio_max_buffering_ms", audio_info.max_buffering_ms);
+	}
+
 	obs_video_info video = {};
 	if (obs_get_video_info(&video)) {
-		obs_data_t *preferences = obs_data_get_obj(root, "preferences");
 		obs_data_set_int(preferences, "composition_gpu_index", video.adapter);
 		obs_data_array_t *canvases = obs_data_array_create();
 		obs_data_t *canvas = obs_data_create();
@@ -185,8 +193,8 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 		obs_data_release(canvas);
 		obs_data_set_array(preferences, "canvases", canvases);
 		obs_data_array_release(canvases);
-		SetObject(root, "preferences", preferences);
 	}
+	SetObject(root, "preferences", preferences);
 
 	return root;
 }
@@ -338,6 +346,18 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		return false;
 	}
 
+	obs_data_t *status = obs_data_get_obj(configuration, "status");
+	if (status) {
+		const char *result = obs_data_get_string(status, "result");
+		if (result && strcmp(result, "error") == 0) {
+			obs_data_release(status);
+			obs_data_release(configuration);
+			error = QStringLiteral("Twitch rechazó la solicitud de Enhanced Broadcasting por el estado de la cuenta o la configuración del canal.");
+			return false;
+		}
+		obs_data_release(status);
+	}
+
 	obs_data_array_t *ingest_endpoints = obs_data_get_array(configuration, "ingest_endpoints");
 	std::string ingest_authentication = stream_key;
 	bool found_rtmp = false;
@@ -480,14 +500,18 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		obs_encoder_set_preferred_range(encoder, ParseRange(obs_data_get_string(encoder_config, "range")));
 
 		obs_data_t *framerate = obs_data_get_obj(encoder_config, "framerate");
-		if (framerate && video.fps_num && video.fps_den) {
-			const uint32_t numerator = (uint32_t)obs_data_get_int(framerate, "numerator");
-			const uint32_t denominator = (uint32_t)obs_data_get_int(framerate, "denominator");
-			if (numerator && denominator) {
-				const double current_fps = (double)video.fps_num / video.fps_den;
-				const double requested_fps = (double)numerator / denominator;
-				const uint32_t divisor = (uint32_t)std::max(1.0, std::round(current_fps / requested_fps));
-				if (divisor > 1) obs_encoder_set_frame_rate_divisor(encoder, divisor);
+		if (framerate) {
+			if (video.fps_num && video.fps_den) {
+				const uint32_t numerator = (uint32_t)obs_data_get_int(framerate, "numerator");
+				const uint32_t denominator = (uint32_t)obs_data_get_int(framerate, "denominator");
+				if (numerator && denominator) {
+					const double current_fps = (double)video.fps_num / video.fps_den;
+					const double requested_fps = (double)numerator / denominator;
+					const uint32_t divisor =
+						(uint32_t)std::max(1.0, std::round(current_fps / requested_fps));
+					if (divisor > 1)
+						obs_encoder_set_frame_rate_divisor(encoder, divisor);
+				}
 			}
 			obs_data_release(framerate);
 		}
