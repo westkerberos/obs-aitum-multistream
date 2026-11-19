@@ -1159,6 +1159,30 @@ void MultistreamDock::stream_output_start(void *data, calldata_t *calldata)
 {
 	auto md = (MultistreamDock *)data;
 	auto output = (obs_output_t *)calldata_ptr(calldata, "output");
+
+	// Log the encoder that actually starts feeding this destination. This makes
+	// it possible to verify the encoded resolution rather than relying on the
+	// OBS canvas/output-resolution settings.
+	obs_encoder_t *startedVideoEncoder = obs_output_get_video_encoder(output);
+	if (startedVideoEncoder) {
+		obs_data_t *encoderSettings = obs_encoder_get_settings(startedVideoEncoder);
+		const int bitrate = encoderSettings ? (int)obs_data_get_int(encoderSettings, "bitrate") : 0;
+		if (encoderSettings)
+			obs_data_release(encoderSettings);
+		const uint32_t divisor = obs_encoder_get_frame_rate_divisor(startedVideoEncoder);
+		struct obs_video_info videoInfo = {};
+		obs_get_video_info(&videoInfo);
+		double fps = videoInfo.fps_den > 0 ? (double)videoInfo.fps_num / (double)videoInfo.fps_den : 0.0;
+		if (divisor > 1)
+			fps /= divisor;
+		blog(LOG_INFO,
+		     "[Aitum Multistream] Output '%s' started with encoder '%s': %ux%u, %.3f fps, %d Kbps, active=%s",
+		     obs_output_get_name(output), obs_encoder_get_name(startedVideoEncoder),
+		     obs_encoder_get_width(startedVideoEncoder), obs_encoder_get_height(startedVideoEncoder), fps, bitrate,
+		     obs_encoder_active(startedVideoEncoder) ? "true" : "false");
+		obs_encoder_release(startedVideoEncoder);
+	}
+
 	if (md->vendor) {
 		auto d = obs_data_create();
 		auto name = obs_output_get_name(output);
