@@ -72,48 +72,8 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 	}
 	obs_data_set_string(root, "authentication", stream_key ? stream_key : "");
 
-	obs_data_t *client = obs_data_get_obj(root, "client");
+	obs_data_t *client = obs_data_create_from_json("{\"name\":\"obs-studio\",\"version\":\"\",\"supported_codecs\":[\"h264\"]}");
 	obs_data_set_string(client, "version", obs_get_version_string());
-	obs_data_array_t *codecs = obs_data_array_create();
-	for (size_t i = 0; i < 128; ++i) {
-		const char *encoder_id = nullptr;
-		if (!obs_enum_encoder_types(i, &encoder_id)) {
-			break;
-		}
-		const char *codec = obs_get_encoder_codec(encoder_id);
-		if (!codec || obs_get_encoder_type(encoder_id) != OBS_ENCODER_VIDEO) {
-			continue;
-		}
-		if (astrcmpi(codec, "h264") == 0 || astrcmpi(codec, "hevc") == 0 || astrcmpi(codec, "av1") == 0) {
-			bool already_added = false;
-			const size_t codec_count = obs_data_array_count(codecs);
-			for (size_t j = 0; j < codec_count; ++j) {
-				obs_data_t *entry = obs_data_array_item(codecs, j);
-				const bool matches = strcmp(obs_data_get_string(entry, "value"), codec) == 0;
-				obs_data_release(entry);
-				if (matches) {
-					already_added = true;
-					break;
-				}
-			}
-			// JSON arrays of strings are represented by obs_data_array_push_back
-			// on an object with a single string value.
-			if (!already_added) {
-				obs_data_t *entry = obs_data_create();
-				obs_data_set_string(entry, "value", codec);
-				obs_data_array_push_back(codecs, entry);
-				obs_data_release(entry);
-			}
-		}
-	}
-	// obs_data arrays serialize objects, so construct supported_codecs as a JSON
-	// string array below from the encoder registry instead of using this array.
-	obs_data_array_release(codecs);
-	obs_data_release(client);
-
-	client = obs_data_create_from_json("{\"name\":\"obs-studio\",\"version\":\"\",\"supported_codecs\":[\"h264\"]}");
-	obs_data_set_string(client, "version", obs_get_version_string());
-	obs_data_array_t *codec_array = obs_data_array_create();
 	bool has_h264 = false, has_hevc = false, has_av1 = false;
 	for (size_t i = 0; i < 128; ++i) {
 		const char *encoder_id = nullptr;
@@ -146,7 +106,6 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 	client_json += "}";
 	client = obs_data_create_from_json(client_json.c_str());
 	SetObject(root, "client", client);
-	obs_data_array_release(codec_array);
 
 	obs_data_t *capabilities = obs_data_get_obj(root, "capabilities");
 	obs_data_t *cpu = obs_data_get_obj(capabilities, "cpu");
@@ -386,7 +345,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 	for (size_t i = 0; i < endpoint_count; ++i) {
 		obs_data_t *endpoint = obs_data_array_item(ingest_endpoints, i);
 		const char *protocol = obs_data_get_string(endpoint, "protocol");
-		if (protocol && astrcmpi(protocol, "RTMP") == 0) {
+		if (protocol && (strcmp(protocol, "RTMP") == 0 || strcmp(protocol, "RTMPS") == 0)) {
 			const char *authentication = obs_data_get_string(endpoint, "authentication");
 			if (authentication && authentication[0]) ingest_authentication = authentication;
 			found_rtmp = true;
@@ -431,7 +390,8 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 
 	QUrl user_key(QString::fromUtf8(stream_key));
 	QUrlQuery user_key_query(user_key);
-	QUrlQuery output_query;
+	QUrl parsed_server(QString::fromStdString(server_url));
+	QUrlQuery output_query(parsed_server);
 	for (const auto &query_item : user_key_query.queryItems()) {
 		output_query.addQueryItem(query_item.first, query_item.second);
 	}
