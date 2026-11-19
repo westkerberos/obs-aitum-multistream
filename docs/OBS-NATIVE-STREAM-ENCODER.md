@@ -13,6 +13,8 @@ When Twitch Enhanced Broadcasting succeeds, OBS uses a separate multitrack outpu
 
 The new selector lets Aitum retrieve the OBS-owned conventional stream encoder by name and attach that exact encoder instance to an Aitum RTMP destination. Aitum does not create a replacement video encoder for this selection and does not transcode a Twitch 1080p track to 1440p.
 
+**Important architectural distinction:** this is not one compressed bitstream shared by Twitch and YouTube. Enhanced Broadcasting keeps its Twitch-negotiated encoders, while the conventional OBS stream encoder is activated in parallel for YouTube. Aitum reuses the OBS-owned encoder object rather than creating its own encoder, but this still adds a separate active video-encoding workload alongside Twitch's EBC tracks. It is not possible to get a single 1440p H.264 bitstream accepted by YouTube and simultaneously have Twitch deliver 1080p to viewers without either Twitch accepting/downscaling a 1440p ingest or a separate 1080p encode. Twitch's current eligibility requirements do not provide 1440p EBC for this non-Affiliate/non-Partner account.
+
 ## How to use
 
 1. Start the OBS main stream with Twitch Enhanced Broadcasting enabled.
