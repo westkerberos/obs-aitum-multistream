@@ -625,6 +625,40 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 	videoEncoder->addItem(QString::fromUtf8(obs_module_text(main ? "MainEncoder" : "VerticalEncoder")),
 			      QVariant(QString::fromUtf8("")));
 
+	// Enhanced Broadcasting replaces the normal streaming output with Twitch's
+	// negotiated multitrack output. OBS still owns its regular stream encoder;
+	// offer it as a separate source so Aitum can reuse it for YouTube.
+	if (main) {
+		obs_encoder_t *nativeEncoder = WestGetOBSNativeStreamEncoder();
+		if (nativeEncoder) {
+			const uint32_t width = obs_encoder_get_width(nativeEncoder);
+			const uint32_t height = obs_encoder_get_height(nativeEncoder);
+			struct obs_video_info nativeVideoInfo = {};
+			obs_get_video_info(&nativeVideoInfo);
+			double nativeFps = nativeVideoInfo.fps_den > 0
+					   ? (double)nativeVideoInfo.fps_num / (double)nativeVideoInfo.fps_den
+					   : 0.0;
+			const uint32_t divisor = obs_encoder_get_frame_rate_divisor(nativeEncoder);
+			if (divisor > 1)
+				nativeFps /= divisor;
+
+			QString description = QString::number(width) + "x" + QString::number(height);
+			if (nativeFps > 0.0)
+				description += QString(" ") + QString::number(nativeFps, 'g', 4) + "fps";
+
+			obs_data_t *nativeSettings = obs_encoder_get_settings(nativeEncoder);
+			const int nativeBitrate = nativeSettings ? (int)obs_data_get_int(nativeSettings, "bitrate") : 0;
+			if (nativeBitrate > 0)
+				description += QString(" ") + QString::number(nativeBitrate) + "Kbps";
+			if (nativeSettings)
+				obs_data_release(nativeSettings);
+
+			videoEncoder->addItem(QString::fromUtf8("OBS Native Stream Encoder — ") + description,
+					      QVariant(QString::fromUtf8(WEST_OBS_NATIVE_STREAM_ENCODER_OPTION)));
+			obs_encoder_release(nativeEncoder);
+		}
+	}
+
 	videoEncoder->setCurrentIndex(0);
 	videoPageLayout->addRow(QString::fromUtf8(obs_module_text("VideoEncoder")), videoEncoder);
 
@@ -759,6 +793,12 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 			const bool encoder_changed = strcmp(obs_data_get_string(settings, "video_encoder"), encoder) != 0;
 			if (encoder_changed)
 				obs_data_set_string(settings, "video_encoder", encoder);
+			if (encoder && strcmp(encoder, WEST_OBS_NATIVE_STREAM_ENCODER_OPTION) == 0) {
+				if (videoEncoderIndex)
+					videoPageLayout->setRowVisible(videoEncoderIndex, false);
+				videoEncoderGroup->setVisible(false);
+				return;
+			}
 			if (!encoder || encoder[0] == '\0') {
 				if (!videoEncoderIndex) {
 				} else if (config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
@@ -821,8 +861,24 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 		if (strcmp(type, current_type) == 0)
 			videoEncoder->setCurrentIndex(videoEncoder->count() - 1);
 	}
-	if (videoEncoder->currentIndex() <= 0)
+	if (strcmp(current_type, WEST_OBS_NATIVE_STREAM_ENCODER_OPTION) == 0) {
+		const int nativeIndex = videoEncoder->findData(QString::fromUtf8(WEST_OBS_NATIVE_STREAM_ENCODER_OPTION));
+		if (nativeIndex >= 0) {
+			videoEncoder->setCurrentIndex(nativeIndex);
+			if (videoEncoderIndex)
+				videoPageLayout->setRowVisible(videoEncoderIndex, false);
+			videoEncoderGroup->setVisible(false);
+		} else {
+			// The OBS-owned encoder is not available in this session; fall back
+			// to Aitum's normal Main Encoder selection instead of keeping a dead choice.
+			obs_data_set_string(settings, "video_encoder", "");
+			obs_data_set_int(settings, "video_encoder_index", 0);
+			videoEncoder->setCurrentIndex(0);
+			videoEncoderGroup->setVisible(false);
+		}
+	} else if (videoEncoder->currentIndex() <= 0) {
 		videoEncoderGroup->setVisible(false);
+	}
 
 	auto audioEncoder = new QComboBox;
 	audioPageLayout->addRow(QString::fromUtf8(obs_module_text("AudioEncoder")), audioEncoder);
