@@ -1180,7 +1180,7 @@ void MultistreamDock::stream_output_start(void *data, calldata_t *calldata)
 		     obs_output_get_name(output), obs_encoder_get_name(startedVideoEncoder),
 		     obs_encoder_get_width(startedVideoEncoder), obs_encoder_get_height(startedVideoEncoder), fps, bitrate,
 		     obs_encoder_active(startedVideoEncoder) ? "true" : "false");
-		obs_encoder_release(startedVideoEncoder);
+		// obs_output_get_video_encoder() returns a borrowed pointer owned by the output.
 	}
 
 	if (md->vendor) {
