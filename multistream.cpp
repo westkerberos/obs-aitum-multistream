@@ -907,6 +907,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 	}
 	obs_encoder_t *venc = nullptr;
 	obs_encoder_t *aenc = nullptr;
+	bool releaseNativeStreamEncoder = false;
 	auto advanced = obs_data_get_bool(settings, "advanced");
 	if (advanced) {
 		auto venc_name = obs_data_get_string(settings, "video_encoder");
@@ -932,6 +933,66 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 						     QString::fromUtf8(obs_module_text("MainOutputEncoderIndexNotFound")));
 				return false;
 			}
+		} else if (strcmp(venc_name, WEST_OBS_NATIVE_STREAM_ENCODER_OPTION) == 0) {
+			// OBS creates this regular stream encoder before Enhanced Broadcasting
+			// switches the active Twitch output to its server-negotiated multitrack group.
+			// Reuse that OBS-owned encoder directly instead of creating another encoder.
+			venc = WestGetOBSNativeStreamEncoder();
+			if (!venc) {
+				blog(LOG_WARNING, "[Aitum Multistream] OBS native stream encoder is not available");
+				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
+						     QString::fromUtf8("OBS native stream encoder is not available. Start the main OBS stream first."));
+				return false;
+			}
+
+			uint32_t width = obs_encoder_get_width(venc);
+			uint32_t height = obs_encoder_get_height(venc);
+			if ((!width || !height) && !obs_encoder_active(venc)) {
+				video_t *video = obs_get_video();
+				if (video)
+					obs_encoder_set_video(venc, video);
+				width = obs_encoder_get_width(venc);
+				height = obs_encoder_get_height(venc);
+			}
+			if (!width || !height) {
+				blog(LOG_WARNING,
+				     "[Aitum Multistream] OBS native stream encoder has no video dimensions (%ux%u)",
+				     width, height);
+				obs_encoder_release(venc);
+				venc = nullptr;
+				QMessageBox::warning(this, QString::fromUtf8(obs_module_text("MainOutputNotActive")),
+						     QString::fromUtf8("OBS native stream encoder has no active video source."));
+				return false;
+			}
+
+			obs_data_t *nativeSettings = obs_encoder_get_settings(venc);
+			const int bitrate = nativeSettings ? (int)obs_data_get_int(nativeSettings, "bitrate") : 0;
+			if (nativeSettings)
+				obs_data_release(nativeSettings);
+			const uint32_t divisor = obs_encoder_get_frame_rate_divisor(venc);
+			struct obs_video_info nativeVideoInfo = {};
+			obs_get_video_info(&nativeVideoInfo);
+			double fps = nativeVideoInfo.fps_den > 0
+					? (double)nativeVideoInfo.fps_num / (double)nativeVideoInfo.fps_den
+					: 0.0;
+			if (divisor > 1)
+				fps /= divisor;
+
+			blog(LOG_INFO,
+			     "[Aitum Multistream] Reusing OBS native stream encoder '%s': %ux%u, %.3f fps, %d Kbps, active=%s",
+			     obs_encoder_get_name(venc), width, height, fps, bitrate,
+			     obs_encoder_active(venc) ? "true" : "false");
+			if (width < 2560 || height < 1440) {
+				blog(LOG_WARNING,
+				     "[Aitum Multistream] OBS native stream encoder is below 1440p (%ux%u); check OBS Video output and Output rescale settings",
+				     width, height);
+			}
+			if (bitrate > 0 && bitrate < 12000) {
+				blog(LOG_WARNING,
+				     "[Aitum Multistream] OBS native stream encoder bitrate is %d Kbps; verify YouTube's 1440p60 bitrate target",
+				     bitrate);
+			}
+			releaseNativeStreamEncoder = true;
 		} else {
 			obs_data_t *s = nullptr;
 			auto ves = obs_data_get_obj(settings, "video_encoder_settings");
@@ -1083,6 +1144,8 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 	//obs_output_get_audio_encoder(main_output, 0);
 
 	obs_output_set_video_encoder(output, venc);
+	if (releaseNativeStreamEncoder)
+		obs_encoder_release(venc);
 	obs_output_set_audio_encoder(output, aenc, 0);
 
 	obs_output_start(output);
