@@ -362,6 +362,7 @@ OutputDialog::OutputDialog(QDialog *parent, QString name, QString server, QStrin
 	outputName = name;
 	outputServer = server;
 	outputKey = key;
+	twitchEnhancedBroadcasting = existingSettings && obs_data_get_bool(existingSettings, "twitch_enhanced_broadcasting");
 	if (verticalCanvasTarget) {
 		tiktokSettings = obs_data_create();
 		if (existingSettings)
@@ -833,6 +834,16 @@ QWidget *OutputDialog::WizardInfoTwitch(bool edit)
 
 	// Server key info
 	formLayout->addWidget(generateInfoLabel("TwitchStreamKeyInfo"));
+
+	// Enhanced Broadcasting is an output-level option, independent of OBS's
+	// built-in stream output and any other destination.
+	auto enhancedBroadcasting = new QCheckBox(QString::fromUtf8(obs_module_text("TwitchEnhancedBroadcasting")));
+	enhancedBroadcasting->setChecked(twitchEnhancedBroadcasting);
+	connect(enhancedBroadcasting, &QCheckBox::toggled, [this](bool enabled) {
+		twitchEnhancedBroadcasting = enabled;
+	});
+	formLayout->addRow(QString(), enhancedBroadcasting);
+	formLayout->addWidget(generateInfoLabel("TwitchEnhancedBroadcastingInfo"));
 
 	contentLayout->addLayout(formLayout);
 
