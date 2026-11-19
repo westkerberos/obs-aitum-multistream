@@ -5,6 +5,7 @@
 #include <curl/curl.h>
 
 #include <QSysInfo>
+#include <QString>
 #include <QUrl>
 #include <QUrlQuery>
 
@@ -17,14 +18,20 @@
 #include <vector>
 
 #ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <dxgi.h>
 #endif
 
 namespace {
-using OBSCanvasAutoRelease = std::unique_ptr<obs_canvas_t, decltype(&obs_canvas_release)>;
-
 constexpr const char *kConfigurationUrl = "https://ingest.twitch.tv/api/v3/GetClientConfiguration";
+
+bool EqualsCaseInsensitive(const char *left, const char *right)
+{
+	return left && right && QString::fromUtf8(left).compare(QString::fromUtf8(right), Qt::CaseInsensitive) == 0;
+}
 
 size_t CurlWriteCallback(char *data, size_t size, size_t count, void *user_data)
 {
@@ -89,9 +96,9 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 		if (!codec) {
 			continue;
 		}
-		if (astrcmpi(codec, "h264") == 0) has_h264 = true;
-		if (astrcmpi(codec, "hevc") == 0) has_hevc = true;
-		if (astrcmpi(codec, "av1") == 0) has_av1 = true;
+		if (EqualsCaseInsensitive(codec, "h264")) has_h264 = true;
+		if (EqualsCaseInsensitive(codec, "hevc")) has_hevc = true;
+		if (EqualsCaseInsensitive(codec, "av1")) has_av1 = true;
 	}
 	// JSON string arrays can be safely injected through the initial data object.
 	std::string supported = "[";
@@ -170,17 +177,15 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 	obs_data_release(capabilities);
 
 	obs_data_t *preferences = obs_data_get_obj(root, "preferences");
-	obs_audio_info2 audio_info = {};
-	if (obs_get_audio_info2(&audio_info)) {
+	obs_audio_info audio_info = {};
+	if (obs_get_audio_info(&audio_info)) {
 		obs_data_set_int(preferences, "audio_samples_per_sec", audio_info.samples_per_sec);
 		obs_data_set_int(preferences, "audio_channels", get_audio_channels(audio_info.speakers));
-		obs_data_set_bool(preferences, "audio_fixed_buffering", audio_info.fixed_buffering);
-		obs_data_set_int(preferences, "audio_max_buffering_ms", audio_info.max_buffering_ms);
+		// OBS 31 exposes the base audio format but not the newer buffering fields.
 	}
 
-	OBSCanvasAutoRelease main_canvas(obs_get_main_canvas(), obs_canvas_release);
 	obs_video_info video = {};
-	if (main_canvas && obs_canvas_get_video_info(main_canvas.get(), &video)) {
+	if (obs_get_video_info(&video)) {
 		obs_data_set_int(preferences, "composition_gpu_index", video.adapter);
 		obs_data_array_t *canvases = obs_data_array_create();
 		obs_data_t *canvas = obs_data_create();
@@ -328,7 +333,7 @@ obs_encoder_t *CreateAudioEncoder(const char *codec, const char *name, obs_data_
 		if (!obs_enum_encoder_types(i, &encoder_id)) break;
 		if (obs_get_encoder_type(encoder_id) != OBS_ENCODER_AUDIO) continue;
 		const char *available_codec = obs_get_encoder_codec(encoder_id);
-		if (!available_codec || astrcmpi(codec, available_codec) != 0) continue;
+		if (!available_codec || !EqualsCaseInsensitive(codec, available_codec)) continue;
 		obs_data_t *settings = obs_data_get_obj(config, "settings");
 		if (!settings) settings = obs_data_create();
 		obs_encoder_t *encoder = obs_audio_encoder_create(encoder_id, name, settings, 0, nullptr);
@@ -369,22 +374,33 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 	}
 
 	obs_data_array_t *ingest_endpoints = obs_data_get_array(configuration, "ingest_endpoints");
-	std::string ingest_authentication = stream_key;
-	bool found_rtmp = false;
-	const size_t endpoint_count = obs_data_array_count(ingest_endpoints);
+	std::string rtmp_url_template;
+	std::string rtmp_authentication;
+	std::string rtmps_url_template;
+	std::string rtmps_authentication;
+	const size_t endpoint_count = ingest_endpoints ? obs_data_array_count(ingest_endpoints) : 0;
 	for (size_t i = 0; i < endpoint_count; ++i) {
 		obs_data_t *endpoint = obs_data_array_item(ingest_endpoints, i);
 		const char *protocol = obs_data_get_string(endpoint, "protocol");
-		if (protocol && (strcmp(protocol, "RTMP") == 0 || strcmp(protocol, "RTMPS") == 0)) {
-			const char *authentication = obs_data_get_string(endpoint, "authentication");
-			if (authentication && authentication[0]) ingest_authentication = authentication;
-			found_rtmp = true;
-			obs_data_release(endpoint);
-			break;
+		const char *url_template = obs_data_get_string(endpoint, "url_template");
+		const char *authentication = obs_data_get_string(endpoint, "authentication");
+		if (url_template && url_template[0] && EqualsCaseInsensitive(protocol, "RTMPS")) {
+			rtmps_url_template = url_template;
+			rtmps_authentication = authentication ? authentication : "";
+		} else if (url_template && url_template[0] && EqualsCaseInsensitive(protocol, "RTMP")) {
+			rtmp_url_template = url_template;
+			rtmp_authentication = authentication ? authentication : "";
 		}
 		obs_data_release(endpoint);
 	}
-	obs_data_array_release(ingest_endpoints);
+	if (ingest_endpoints) obs_data_array_release(ingest_endpoints);
+	// Prefer the secure Twitch ingest endpoint, falling back to RTMP only when
+	// Twitch does not offer RTMPS for this configuration.
+	const bool use_rtmps = !rtmps_url_template.empty();
+	const std::string ingest_url_template = use_rtmps ? rtmps_url_template : rtmp_url_template;
+	const std::string ingest_authentication =
+		use_rtmps ? rtmps_authentication : rtmp_authentication;
+	const bool found_rtmp = !ingest_url_template.empty();
 	if (!found_rtmp) {
 		obs_data_release(configuration);
 		error = QStringLiteral("Twitch no devolvió un endpoint RTMP para Enhanced Broadcasting.");
@@ -412,21 +428,26 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 	}
 
 	obs_data_t *service_settings = obs_data_create();
-	std::string server_url = stream_server;
+	std::string server_url = ingest_url_template;
 	const std::string stream_key_token = "/{stream_key}";
 	const size_t token_position = server_url.find(stream_key_token);
 	if (token_position != std::string::npos) server_url.erase(token_position);
 	obs_data_set_string(service_settings, "server", server_url.c_str());
 
-	QUrl user_key(QString::fromUtf8(stream_key));
-	QUrlQuery user_key_query(user_key);
+	// Match OBS's native Twitch EBC service setup: the ingest URL template
+	// supplies the server and query parameters; endpoint authentication (when
+	// present) supplies the key, while the user's key contributes extra query
+	// parameters such as bandwidthtest.
 	QUrl parsed_server(QString::fromStdString(server_url));
 	QUrlQuery output_query(parsed_server);
+	QUrl user_key(QString::fromUtf8(stream_key));
+	QUrlQuery user_key_query(user_key);
 	for (const auto &query_item : user_key_query.queryItems()) {
 		output_query.addQueryItem(query_item.first, query_item.second);
 	}
 	output_query.addQueryItem(QStringLiteral("clientConfigId"), QString::fromStdString(config_id_value));
-	QUrl configured_key(QString::fromUtf8(ingest_authentication.c_str()));
+	const std::string key_value = ingest_authentication.empty() ? std::string(stream_key) : ingest_authentication;
+	QUrl configured_key(QString::fromStdString(key_value));
 	configured_key.setQuery(output_query);
 	obs_data_set_string(service_settings, "key", configured_key.toString(QUrl::FullyEncoded).toUtf8().constData());
 
@@ -461,10 +482,10 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		return false;
 	}
 
-	OBSCanvasAutoRelease main_canvas(obs_get_main_canvas(), obs_canvas_release);
-	video_t *main_video = main_canvas ? obs_canvas_get_video(main_canvas.get()) : nullptr;
+	// Bind Twitch's encoders to OBS's primary (horizontal) video output.
+	video_t *main_video = obs_get_video();
 	obs_video_info video = {};
-	if (!main_video || !obs_canvas_get_video_info(main_canvas.get(), &video)) {
+	if (!main_video || !obs_get_video_info(&video)) {
 		obs_output_release(ebc_output);
 		obs_data_array_release(video_configs);
 		obs_data_release(configuration);
@@ -514,8 +535,9 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		obs_encoder_set_scaled_size(encoder, width, height);
 		obs_encoder_set_gpu_scale_type(encoder, ParseScaleType(obs_data_get_string(encoder_config, "gpu_scale_type")));
 		obs_encoder_set_preferred_video_format(encoder, ParseVideoFormat(obs_data_get_string(encoder_config, "format")));
-		obs_encoder_set_preferred_color_space(encoder, ParseColorSpace(obs_data_get_string(encoder_config, "colorspace")));
-		obs_encoder_set_preferred_range(encoder, ParseRange(obs_data_get_string(encoder_config, "range")));
+		// OBS 31 has no per-encoder preferred colorspace/range setters. The
+		// encoder consumes the main OBS video output format; the negotiated
+		// format is still applied below.
 
 		obs_data_t *framerate = obs_data_get_obj(encoder_config, "framerate");
 		if (framerate) {
