@@ -277,7 +277,8 @@ bool EncoderTypeAvailable(const char *type, enum obs_encoder_type expected_type)
 
 obs_scale_type ParseScaleType(const char *value)
 {
-	if (!value) return OBS_SCALE_BICUBIC;
+	if (!value || strcmp(value, "OBS_SCALE_BICUBIC") == 0) return OBS_SCALE_BICUBIC;
+	if (strcmp(value, "OBS_SCALE_DISABLE") == 0) return OBS_SCALE_DISABLE;
 	if (strcmp(value, "OBS_SCALE_POINT") == 0) return OBS_SCALE_POINT;
 	if (strcmp(value, "OBS_SCALE_BILINEAR") == 0) return OBS_SCALE_BILINEAR;
 	if (strcmp(value, "OBS_SCALE_LANCZOS") == 0) return OBS_SCALE_LANCZOS;
@@ -288,7 +289,9 @@ obs_scale_type ParseScaleType(const char *value)
 video_colorspace ParseColorSpace(const char *value)
 {
 	if (!value) return VIDEO_CS_709;
+	if (strcmp(value, "VIDEO_CS_DEFAULT") == 0) return VIDEO_CS_DEFAULT;
 	if (strcmp(value, "VIDEO_CS_601") == 0) return VIDEO_CS_601;
+	if (strcmp(value, "VIDEO_CS_709") == 0) return VIDEO_CS_709;
 	if (strcmp(value, "VIDEO_CS_SRGB") == 0) return VIDEO_CS_SRGB;
 	if (strcmp(value, "VIDEO_CS_2100_PQ") == 0) return VIDEO_CS_2100_PQ;
 	if (strcmp(value, "VIDEO_CS_2100_HLG") == 0) return VIDEO_CS_2100_HLG;
@@ -297,14 +300,18 @@ video_colorspace ParseColorSpace(const char *value)
 
 video_range_type ParseRange(const char *value)
 {
+	if (value && strcmp(value, "VIDEO_RANGE_DEFAULT") == 0) return VIDEO_RANGE_DEFAULT;
 	if (value && strcmp(value, "VIDEO_RANGE_FULL") == 0) return VIDEO_RANGE_FULL;
+	if (value && strcmp(value, "VIDEO_RANGE_PARTIAL") == 0) return VIDEO_RANGE_PARTIAL;
 	return VIDEO_RANGE_PARTIAL;
 }
 
 video_format ParseVideoFormat(const char *value)
 {
 	if (!value) return VIDEO_FORMAT_NV12;
+	if (strcmp(value, "VIDEO_FORMAT_NONE") == 0) return VIDEO_FORMAT_NONE;
 	if (strcmp(value, "VIDEO_FORMAT_I420") == 0) return VIDEO_FORMAT_I420;
+	if (strcmp(value, "VIDEO_FORMAT_NV12") == 0) return VIDEO_FORMAT_NV12;
 	if (strcmp(value, "VIDEO_FORMAT_BGRA") == 0) return VIDEO_FORMAT_BGRA;
 	if (strcmp(value, "VIDEO_FORMAT_I444") == 0) return VIDEO_FORMAT_I444;
 	if (strcmp(value, "VIDEO_FORMAT_I010") == 0) return VIDEO_FORMAT_I010;
