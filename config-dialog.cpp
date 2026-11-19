@@ -642,7 +642,12 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 			if (divisor > 1)
 				nativeFps /= divisor;
 
-			QString description = QString::number(width) + "x" + QString::number(height);
+			QString description;
+			if (width > 0 && height > 0) {
+				description = QString::number(width) + "x" + QString::number(height);
+			} else {
+				description = QString::fromUtf8("resolution follows OBS stream settings");
+			}
 			if (nativeFps > 0.0)
 				description += QString(" ") + QString::number(nativeFps, 'g', 4) + "fps";
 
