@@ -111,8 +111,8 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 
 	obs_data_t *capabilities = obs_data_get_obj(root, "capabilities");
 	obs_data_t *cpu = obs_data_get_obj(capabilities, "cpu");
-	const uint32_t logical_cores = std::max(1u, os_get_logical_cores());
-	const uint32_t physical_cores = std::max(1u, os_get_physical_cores());
+	const int logical_cores = std::max(1, os_get_logical_cores());
+	const int physical_cores = std::max(1, os_get_physical_cores());
 	obs_data_set_int(cpu, "logical_cores", logical_cores);
 	obs_data_set_int(cpu, "physical_cores", physical_cores);
 	obs_data_set_string(cpu, "name", "Unknown");
