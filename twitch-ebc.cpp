@@ -22,6 +22,8 @@
 #endif
 
 namespace {
+using OBSCanvasAutoRelease = std::unique_ptr<obs_canvas_t, decltype(&obs_canvas_release)>;
+
 constexpr const char *kConfigurationUrl = "https://ingest.twitch.tv/api/v3/GetClientConfiguration";
 
 size_t CurlWriteCallback(char *data, size_t size, size_t count, void *user_data)
@@ -176,8 +178,9 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 		obs_data_set_int(preferences, "audio_max_buffering_ms", audio_info.max_buffering_ms);
 	}
 
+	OBSCanvasAutoRelease main_canvas(obs_get_main_canvas(), obs_canvas_release);
 	obs_video_info video = {};
-	if (obs_get_video_info(&video)) {
+	if (main_canvas && obs_canvas_get_video_info(main_canvas.get(), &video)) {
 		obs_data_set_int(preferences, "composition_gpu_index", video.adapter);
 		obs_data_array_t *canvases = obs_data_array_create();
 		obs_data_t *canvas = obs_data_create();
@@ -451,8 +454,16 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		return false;
 	}
 
+	OBSCanvasAutoRelease main_canvas(obs_get_main_canvas(), obs_canvas_release);
+	video_t *main_video = main_canvas ? obs_canvas_get_video(main_canvas.get()) : nullptr;
 	obs_video_info video = {};
-	obs_get_video_info(&video);
+	if (!main_video || !obs_canvas_get_video_info(main_canvas.get(), &video)) {
+		obs_output_release(ebc_output);
+		obs_data_array_release(video_configs);
+		obs_data_release(configuration);
+		error = QStringLiteral("No se pudo acceder al canvas principal de OBS para crear los encoders de Twitch.");
+		return false;
+	}
 	for (size_t i = 0; i < video_count; ++i) {
 		obs_data_t *encoder_config = obs_data_array_item(video_configs, i);
 		const char *encoder_type = obs_data_get_string(encoder_config, "type");
@@ -481,7 +492,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 			error = QStringLiteral("OBS no pudo crear uno de los encoders de vídeo solicitados por Twitch.");
 			return false;
 		}
-		obs_encoder_set_video(encoder, obs_get_video());
+		obs_encoder_set_video(encoder, main_video);
 		const uint32_t width = (uint32_t)obs_data_get_int(encoder_config, "width");
 		const uint32_t height = (uint32_t)obs_data_get_int(encoder_config, "height");
 		if (!width || !height) {
