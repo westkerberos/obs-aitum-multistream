@@ -12,3 +12,6 @@ using TwitchEbcEncoderGroup = std::shared_ptr<obs_encoder_group_t>;
 bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char *stream_server,
 					    const char *stream_key, obs_output_t **output,
 					    TwitchEbcEncoderGroup &encoder_group, QString &error);
+
+// Releases an EBC output and the service reference assigned to it.
+void ReleaseTwitchEnhancedBroadcastingOutput(obs_output_t *output);
