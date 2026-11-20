@@ -200,16 +200,19 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key, const std::vector<obs_ca
 	obs_data_release(capabilities);
 
 	obs_data_t *preferences = obs_data_get_obj(root, "preferences");
-	obs_audio_info audio_info = {};
-	if (obs_get_audio_info(&audio_info)) {
+	obs_audio_info2 audio_info = {};
+	if (obs_get_audio_info2(&audio_info)) {
 		obs_data_set_int(preferences, "audio_samples_per_sec", audio_info.samples_per_sec);
 		obs_data_set_int(preferences, "audio_channels", get_audio_channels(audio_info.speakers));
-		// OBS 31 exposes the base audio format but not the newer buffering fields.
+		obs_data_set_bool(preferences, "audio_fixed_buffering", audio_info.fixed_buffering);
+		obs_data_set_int(preferences, "audio_max_buffering_ms", audio_info.max_buffering_ms);
 	}
 
 	obs_video_info main_video = {};
-	if (!canvas_list.empty() && obs_canvas_get_video_info(canvas_list.front(), &main_video)) {
+	if (obs_get_video_info(&main_video))
 		obs_data_set_int(preferences, "composition_gpu_index", main_video.adapter);
+
+	if (!canvas_list.empty() && obs_canvas_get_video_info(canvas_list.front(), &main_video)) {
 		obs_data_array_t *canvases = obs_data_array_create();
 		for (size_t i = 0; i < canvas_list.size(); ++i) {
 			obs_video_info video = {};
