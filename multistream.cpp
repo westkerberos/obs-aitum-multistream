@@ -24,6 +24,22 @@ OBS_MODULE_AUTHOR("Aitum");
 OBS_MODULE_USE_DEFAULT_LOCALE("aitum-multistream", "en-US")
 
 static MultistreamDock *multistream_dock = nullptr;
+static bool twitch_ebc_encoder_proc_registered = false;
+
+static void get_twitch_ebc_encoder(void *data, calldata_t *params)
+{
+	UNUSED_PARAMETER(data);
+	if (!multistream_dock)
+		return;
+
+	video_t *canvas_video = static_cast<video_t *>(calldata_ptr(params, "canvas_video"));
+	if (!canvas_video)
+		return;
+
+	obs_encoder_t *encoder = multistream_dock->GetTwitchEnhancedBroadcastingEncoder(canvas_video);
+	if (encoder)
+		calldata_set_ptr(params, "encoder", encoder);
+}
 
 update_info_t *version_update_info = nullptr;
 
@@ -56,6 +72,18 @@ bool obs_module_load(void)
 	const auto main_window = static_cast<QMainWindow *>(obs_frontend_get_main_window());
 	multistream_dock = new MultistreamDock(main_window);
 	obs_frontend_add_dock_by_id("AitumMultistreamDock", obs_module_text("AitumMultistream"), multistream_dock);
+
+	// Let Aitum Vertical reuse the exact vertical encoder already negotiated by Twitch EBC.
+	// proc_handler_add has no removal API, so register once and make the callback tolerate unload.
+	if (!twitch_ebc_encoder_proc_registered) {
+		proc_handler_t *handler = obs_get_proc_handler();
+		if (handler) {
+			proc_handler_add(handler,
+					 "void aitum_multistream_get_twitch_ebc_encoder(in ptr canvas_video, out ptr encoder)",
+					 get_twitch_ebc_encoder, nullptr);
+			twitch_ebc_encoder_proc_registered = true;
+		}
+	}
 
 	std::string url = "https://api.aitum.tv/plugin/multi?version=" PROJECT_VERSION;
 	const char *pguid = config_get_string(obs_frontend_get_app_config(), "General", "InstallGUID");
@@ -90,7 +118,10 @@ void obs_module_unload()
 		version_update_info = nullptr;
 	}
 	if (multistream_dock) {
-		delete multistream_dock;
+		// The global proc handler outlives this module; prevent callbacks into a destroyed dock.
+		MultistreamDock *dock = multistream_dock;
+		multistream_dock = nullptr;
+		delete dock;
 	}
 }
 
@@ -1589,6 +1620,40 @@ void MultistreamDock::AskUpdate()
 	}
 	obs_data_release(config);
 	bfree(path);
+}
+
+obs_encoder_t *MultistreamDock::GetTwitchEnhancedBroadcastingEncoder(video_t *canvas_video)
+{
+	if (!canvas_video)
+		return nullptr;
+
+	// This method is called synchronously through OBS's global proc handler.
+	// Outputs and encoder references are owned by this dock on the OBS UI thread.
+	for (const auto &entry : outputs) {
+		const std::string &output_name = std::get<0>(entry);
+		if (enhanced_encoder_groups.find(output_name) == enhanced_encoder_groups.end())
+			continue;
+
+		obs_output_t *output = std::get<1>(entry);
+		if (!output || !obs_output_active(output))
+			continue;
+
+		for (size_t index = 0; index < MAX_OUTPUT_VIDEO_ENCODERS; ++index) {
+			// obs_output_get_video_encoder2 returns a borrowed pointer.
+			obs_encoder_t *encoder = obs_output_get_video_encoder2(output, index);
+			if (!encoder || !obs_encoder_active(encoder))
+				continue;
+
+			if (obs_encoder_video(encoder) == canvas_video) {
+				blog(LOG_INFO,
+				     "[Aitum EBC] Reusing negotiated encoder '%s' (%ux%u) for Aitum Vertical",
+				     obs_encoder_get_name(encoder), obs_encoder_get_width(encoder), obs_encoder_get_height(encoder));
+				return obs_encoder_get_ref(encoder);
+			}
+		}
+	}
+
+	return nullptr;
 }
 
 void MultistreamDock::LoadWebsocket()
