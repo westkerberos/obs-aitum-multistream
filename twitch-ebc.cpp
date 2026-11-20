@@ -369,6 +369,19 @@ obs_encoder_t *CreateAudioEncoder(const char *codec, const char *name, obs_data_
 }
 } // namespace
 
+void ReleaseTwitchEnhancedBroadcastingOutput(obs_output_t *output)
+{
+	if (!output)
+		return;
+
+	// obs_output_get_service returns a borrowed pointer. Release the output
+	// first so OBS clears service->output, then release our service reference.
+	obs_service_t *service = obs_output_get_service(output);
+	obs_output_release(output);
+	if (service)
+		obs_service_release(service);
+}
+
 bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char *stream_server,
 					    const char *stream_key, obs_output_t **output,
 					    TwitchEbcEncoderGroup &encoder_group, QString &error)
@@ -515,12 +528,13 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		error = QStringLiteral("No se pudo crear la salida RTMP de Enhanced Broadcasting.");
 		return false;
 	}
+	// obs_output_set_service stores a borrowed pointer; the service must stay
+	// alive for the entire output lifetime and is released with the output.
 	obs_output_set_service(ebc_output, service);
-	obs_service_release(service);
 
 	encoder_group = TwitchEbcEncoderGroup(obs_encoder_group_create(), obs_encoder_group_destroy);
 	if (!encoder_group) {
-		obs_output_release(ebc_output);
+		ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 		obs_data_array_release(video_configs);
 		obs_data_release(configuration);
 		error = QStringLiteral("No se pudo crear el grupo de encoders de Twitch.");
@@ -531,7 +545,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 	video_t *main_video = obs_get_video();
 	obs_video_info video = {};
 	if (!main_video || !obs_get_video_info(&video)) {
-		obs_output_release(ebc_output);
+		ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 		obs_data_array_release(video_configs);
 		obs_data_release(configuration);
 		error = QStringLiteral("No se pudo acceder al canvas principal de OBS para crear los encoders de Twitch.");
@@ -542,7 +556,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		const char *encoder_type = obs_data_get_string(encoder_config, "type");
 		if (!encoder_type || !EncoderTypeAvailable(encoder_type, OBS_ENCODER_VIDEO)) {
 			obs_data_release(encoder_config);
-			obs_output_release(ebc_output);
+			ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 			obs_data_array_release(video_configs);
 			obs_data_release(configuration);
 			error = QStringLiteral("El encoder de vídeo solicitado por Twitch no está disponible en OBS.");
@@ -559,7 +573,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		obs_data_release(encoder_settings);
 		if (!encoder) {
 			obs_data_release(encoder_config);
-			obs_output_release(ebc_output);
+			ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 			obs_data_array_release(video_configs);
 			obs_data_release(configuration);
 			error = QStringLiteral("OBS no pudo crear uno de los encoders de vídeo solicitados por Twitch.");
@@ -571,7 +585,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		if (!width || !height) {
 			obs_encoder_release(encoder);
 			obs_data_release(encoder_config);
-			obs_output_release(ebc_output);
+			ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 			obs_data_array_release(video_configs);
 			obs_data_release(configuration);
 			error = QStringLiteral("Twitch devolvió una resolución inválida para uno de los encoders.");
@@ -603,7 +617,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		if (!obs_encoder_set_group(encoder, encoder_group.get())) {
 			obs_encoder_release(encoder);
 			obs_data_release(encoder_config);
-			obs_output_release(ebc_output);
+			ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 			obs_data_array_release(video_configs);
 			obs_data_release(configuration);
 			error = QStringLiteral("OBS no pudo asociar un encoder al grupo de Enhanced Broadcasting.");
@@ -621,7 +635,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 	if (!audio_count || audio_count > MAX_OUTPUT_AUDIO_ENCODERS) {
 		obs_data_array_release(audio_configs);
 		if (audio_configurations) obs_data_release(audio_configurations);
-		obs_output_release(ebc_output);
+		ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 		obs_data_release(configuration);
 		error = QStringLiteral("Twitch devolvió una configuración de audio vacía o no válida.");
 		return false;
@@ -638,7 +652,7 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 			obs_data_release(audio_config);
 			obs_data_array_release(audio_configs);
 			obs_data_release(audio_configurations);
-			obs_output_release(ebc_output);
+			ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 			obs_data_release(configuration);
 			error = QStringLiteral("No hay un encoder de audio compatible con el codec %1 que solicitó Twitch.")
 					.arg(QString::fromUtf8(codec ? codec : "desconocido"));
