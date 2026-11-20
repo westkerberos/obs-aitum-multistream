@@ -993,7 +993,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 		auto fail_ebc_preflight = [this, ebc_output](const QString &detail) {
 			obs_output_release(ebc_output);
 			QMessageBox::warning(this, QStringLiteral("Twitch Enhanced Broadcasting"),
-					     QStringLiteral("No se pudo preparar Enhanced Broadcasting.\\n\\nDiagnóstico: %1")
+					     QStringLiteral("No se pudo preparar Enhanced Broadcasting.\n\nDiagnóstico: %1")
 						     .arg(detail));
 			return false;
 		};
@@ -1031,7 +1031,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 				const char *encoder_error = obs_encoder_get_last_error(encoder);
 				if (encoder_error && encoder_error[0]) {
 					if (!detail.isEmpty())
-						detail += QStringLiteral("\\n");
+						detail += QStringLiteral("\n");
 					detail += QStringLiteral("Vídeo %1: %2")
 							  .arg(i)
 							  .arg(QString::fromUtf8(encoder_error));
@@ -1044,7 +1044,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 				const char *encoder_error = obs_encoder_get_last_error(encoder);
 				if (encoder_error && encoder_error[0]) {
 					if (!detail.isEmpty())
-						detail += QStringLiteral("\\n");
+						detail += QStringLiteral("\n");
 					detail += QStringLiteral("Audio %1: %2")
 							  .arg(i)
 							  .arg(QString::fromUtf8(encoder_error));
@@ -1076,7 +1076,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 			obs_output_release(ebc_output);
 			QMessageBox::warning(
 				this, QStringLiteral("Twitch Enhanced Broadcasting"),
-				QStringLiteral("OBS no pudo iniciar la salida Enhanced Broadcasting de Twitch.\\n\\nDetalle: %1")
+				QStringLiteral("OBS no pudo iniciar la salida Enhanced Broadcasting de Twitch.\n\nDetalle: %1")
 					.arg(last_error));
 			return false;
 		}
