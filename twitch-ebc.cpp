@@ -6,6 +6,9 @@
 
 #include <QSysInfo>
 #include <QString>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTextDocument>
 #include <QUrl>
 #include <QUrlQuery>
@@ -585,8 +588,18 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		return false;
 	}
 
+	QJsonArray bitrate_interpolation_array;
+	bool has_interpolation_data = true;
 	for (size_t i = 0; i < video_count; ++i) {
 		obs_data_t *encoder_config = obs_data_array_item(video_configs, i);
+		const char *encoder_config_json = obs_data_get_json(encoder_config);
+		const QJsonDocument encoder_config_document =
+			QJsonDocument::fromJson(QByteArray(encoder_config_json ? encoder_config_json : "{}"));
+		const QJsonArray interpolation_points =
+			encoder_config_document.object().value(QStringLiteral("bitrate_interpolation_points")).toArray();
+		if (interpolation_points.isEmpty())
+			has_interpolation_data = false;
+		bitrate_interpolation_array.append(interpolation_points);
 		const char *encoder_type = obs_data_get_string(encoder_config, "type");
 		if (!encoder_type || !EncoderTypeAvailable(encoder_type, OBS_ENCODER_VIDEO)) {
 			obs_data_release(encoder_config);
@@ -658,9 +671,8 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		obs_encoder_set_scaled_size(encoder, width, height);
 		obs_encoder_set_gpu_scale_type(encoder, ParseScaleType(obs_data_get_string(encoder_config, "gpu_scale_type")));
 		obs_encoder_set_preferred_video_format(encoder, ParseVideoFormat(obs_data_get_string(encoder_config, "format")));
-		// OBS 31 has no per-encoder preferred colorspace/range setters. The
-		// encoder consumes the main OBS video output format; the negotiated
-		// format is still applied below.
+		obs_encoder_set_preferred_color_space(encoder, ParseColorSpace(obs_data_get_string(encoder_config, "colorspace")));
+		obs_encoder_set_preferred_range(encoder, ParseRange(obs_data_get_string(encoder_config, "range")));
 
 		obs_data_t *framerate = obs_data_get_obj(encoder_config, "framerate");
 		if (framerate) {
@@ -668,10 +680,9 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 				const uint32_t numerator = (uint32_t)obs_data_get_int(framerate, "numerator");
 				const uint32_t denominator = (uint32_t)obs_data_get_int(framerate, "denominator");
 				if (numerator && denominator) {
-					const double current_fps = (double)video.fps_num / video.fps_den;
-					const double requested_fps = (double)numerator / denominator;
-					const uint32_t divisor =
-						(uint32_t)(std::max)(1.0, std::round(current_fps / requested_fps));
+					const uint64_t target = (uint64_t)numerator * video.fps_den;
+					const uint64_t source = (uint64_t)video.fps_num * denominator;
+					const uint32_t divisor = target ? (std::max)(1u, (uint32_t)(source / target)) : 1u;
 					if (divisor > 1)
 						obs_encoder_set_frame_rate_divisor(encoder, divisor);
 				}
@@ -692,6 +703,19 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		obs_data_release(encoder_config);
 	}
 	obs_data_array_release(video_configs);
+
+	// Match OBS native Multitrack Video: only attach an interpolation table when
+	// Twitch supplied non-empty points for every negotiated video encoder.
+	if (has_interpolation_data) {
+		const QByteArray interpolation_json =
+			QJsonDocument(bitrate_interpolation_array).toJson(QJsonDocument::Compact);
+		obs_data_t *output_settings = obs_output_get_settings(ebc_output);
+		obs_data_set_string(output_settings, "interpolation_table_data", interpolation_json.constData());
+		obs_output_update(ebc_output, output_settings);
+		obs_data_release(output_settings);
+	} else {
+		blog(LOG_INFO, "[Aitum EBC] Interpolation data missing for one or more encoders; using OBS default linear interpolation");
+	}
 
 	obs_data_t *audio_configurations = obs_data_get_obj(configuration, "audio_configurations");
 	obs_data_array_t *audio_configs = audio_configurations ? obs_data_get_array(audio_configurations, "live") : nullptr;
