@@ -904,6 +904,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 		obs_output_release(old);
 		obs_service_release(service);
 		enhanced_encoder_groups.erase(std::get<std::string>(*it));
+		enhanced_encoder_canvases.erase(std::get<std::string>(*it));
 		outputs.erase(it);
 		break;
 	}
@@ -922,13 +923,37 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 			return false;
 		}
 
+		// Aitum Vertical Canvas exposes its OBS canvas under this stable name.
+		// If the plugin/canvas is unavailable, regular horizontal Enhanced Broadcasting
+		// remains available as a fallback.
+		std::shared_ptr<obs_canvas_t> vertical_canvas;
+		obs_canvas_t *vertical_canvas_raw = obs_get_canvas_by_name("Aitum Vertical");
+		if (vertical_canvas_raw) {
+			obs_video_info vertical_info = {};
+			if (obs_canvas_get_video(vertical_canvas_raw) &&
+			    obs_canvas_get_video_info(vertical_canvas_raw, &vertical_info) &&
+			    vertical_info.base_height > vertical_info.base_width) {
+				vertical_canvas = std::shared_ptr<obs_canvas_t>(vertical_canvas_raw, obs_canvas_release);
+				blog(LOG_INFO, "[Aitum EBC] Detected Aitum Vertical canvas: %ux%u",
+				     vertical_info.base_width, vertical_info.base_height);
+			} else {
+				blog(LOG_WARNING, "[Aitum EBC] 'Aitum Vertical' exists but does not expose an active portrait video canvas");
+				obs_canvas_release(vertical_canvas_raw);
+			}
+		} else {
+			blog(LOG_WARNING, "[Aitum EBC] Aitum Vertical canvas not found; Twitch will receive horizontal canvas only");
+		}
+
 		obs_output_t *ebc_output = nullptr;
 		TwitchEbcEncoderGroup encoder_group;
 		QString ebc_error;
-		if (!CreateTwitchEnhancedBroadcastingOutput(name, server, key, &ebc_output, encoder_group, ebc_error)) {
+		if (!CreateTwitchEnhancedBroadcastingOutput(name, server, key, vertical_canvas.get(),
+						     &ebc_output, encoder_group, ebc_error)) {
 			QMessageBox::warning(this, QStringLiteral("Twitch Enhanced Broadcasting"), ebc_error);
 			return false;
 		}
+		if (vertical_canvas)
+			enhanced_encoder_canvases[name] = std::move(vertical_canvas);
 
 		config_t *profile_config = obs_frontend_get_profile_config();
 		if (profile_config) {
@@ -1339,9 +1364,11 @@ void MultistreamDock::stream_output_stop(void *data, calldata_t *calldata)
 				else
 					obs_output_release(output);
 				md->enhanced_encoder_groups.erase(output_settings_name);
+				md->enhanced_encoder_canvases.erase(output_settings_name);
 			}, Qt::QueuedConnection);
 		} else {
 			md->enhanced_encoder_groups.erase(output_settings_name);
+			md->enhanced_encoder_canvases.erase(output_settings_name);
 		}
 		md->outputs.erase(it);
 		break;
