@@ -626,6 +626,14 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 	videoEncoder->addItem(QString::fromUtf8(obs_module_text(main ? "MainEncoder" : "VerticalEncoder")),
 			      QVariant(QString::fromUtf8("")));
 
+	static constexpr char TWITCH_EBC_VERTICAL_ENCODER[] = "__aitum_twitch_ebc_vertical__";
+	if (!main) {
+		videoEncoder->addItem(QString::fromUtf8(obs_module_text("TwitchEbcVerticalEncoder")),
+				      QVariant(QString::fromUtf8(TWITCH_EBC_VERTICAL_ENCODER)));
+		videoEncoder->setItemData(1, QString::fromUtf8(obs_module_text("TwitchEbcVerticalEncoderInfo")),
+					  Qt::ToolTipRole);
+	}
+
 	videoEncoder->setCurrentIndex(0);
 	videoPageLayout->addRow(QString::fromUtf8(obs_module_text("VideoEncoder")), videoEncoder);
 
@@ -760,6 +768,19 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 			const bool encoder_changed = strcmp(obs_data_get_string(settings, "video_encoder"), encoder) != 0;
 			if (encoder_changed)
 				obs_data_set_string(settings, "video_encoder", encoder);
+			if (!main && strcmp(encoder, TWITCH_EBC_VERTICAL_ENCODER) == 0) {
+				if (videoEncoderIndex)
+					videoPageLayout->setRowVisible(videoEncoderIndex, false);
+				auto t = video_encoder_properties.find(serverGroup);
+				if (t != video_encoder_properties.end()) {
+					obs_properties_destroy(t->second);
+					video_encoder_properties.erase(t);
+				}
+				for (int i = videoEncoderGroupLayout->rowCount() - 1; i >= 2; i--)
+					videoEncoderGroupLayout->removeRow(i);
+				videoEncoderGroup->setVisible(false);
+				return;
+			}
 			if (!encoder || encoder[0] == '\0') {
 				if (!videoEncoderIndex) {
 				} else if (config_get_bool(obs_frontend_get_profile_config(), "Stream1", "EnableMultitrackVideo")) {
@@ -807,6 +828,8 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 		});
 
 	const char *current_type = obs_data_get_string(settings, "video_encoder");
+	if (!main && current_type && strcmp(current_type, TWITCH_EBC_VERTICAL_ENCODER) == 0)
+		videoEncoder->setCurrentIndex(1);
 	const char *type;
 	size_t idx = 0;
 	while (obs_enum_encoder_types(idx++, &type)) {
@@ -1019,20 +1042,6 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 	server_title_layout->addWidget(removeButton, 0, Qt::AlignRight);
 
 	serverLayout->addRow(server_title_layout);
-
-	if (!main) {
-		static constexpr char reuse_ebc_key[] = "use_twitch_ebc_encoder";
-		if (!obs_data_has_user_value(settings, reuse_ebc_key))
-			obs_data_set_bool(settings, reuse_ebc_key, true);
-		auto reuseEbcEncoder =
-			new QCheckBox(QString::fromUtf8(obs_module_text("ReuseTwitchEbcVerticalEncoder")));
-		reuseEbcEncoder->setChecked(obs_data_get_bool(settings, reuse_ebc_key));
-		reuseEbcEncoder->setToolTip(
-			QString::fromUtf8(obs_module_text("ReuseTwitchEbcVerticalEncoderInfo")));
-		connect(reuseEbcEncoder, &QCheckBox::toggled,
-			[settings](bool checked) { obs_data_set_bool(settings, "use_twitch_ebc_encoder", checked); });
-		serverLayout->addRow(reuseEbcEncoder);
-	}
 
 	serverLayout->addRow(advancedGroup);
 
