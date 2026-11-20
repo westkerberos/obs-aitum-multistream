@@ -1592,7 +1592,7 @@ void MultistreamDock::AskUpdate()
 	bfree(path);
 }
 
-remove lookup methodvoid MultistreamDock::LoadWebsocket()
+void MultistreamDock::LoadWebsocket()
 {
 	if (vendor) {
 		return;
