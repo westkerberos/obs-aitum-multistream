@@ -949,11 +949,23 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 		signal_handler_connect(ebc_signal, "start", stream_output_start, this);
 		signal_handler_connect(ebc_signal, "stop", stream_output_stop, this);
 		if (!obs_output_start(ebc_output)) {
+			// Keep the encoder/output error before releasing the output. OBS 33
+			// exposes encoder initialization failures through this accessor.
+			const char *last_error_raw = obs_output_get_last_error(ebc_output);
+			const QString last_error =
+				last_error_raw && last_error_raw[0]
+					? QString::fromUtf8(last_error_raw)
+					: QStringLiteral("OBS no informó un error interno del encoder o de la conexión.");
+			blog(LOG_ERROR, "[Aitum EBC] obs_output_start failed for '%s': %s",
+			     name, last_error.toUtf8().constData());
+
 			signal_handler_disconnect(ebc_signal, "start", stream_output_start, this);
 			signal_handler_disconnect(ebc_signal, "stop", stream_output_stop, this);
 			obs_output_release(ebc_output);
-			QMessageBox::warning(this, QStringLiteral("Twitch Enhanced Broadcasting"),
-					     QStringLiteral("OBS no pudo iniciar la salida Enhanced Broadcasting de Twitch. Revisa el registro de OBS."));
+			QMessageBox::warning(
+				this, QStringLiteral("Twitch Enhanced Broadcasting"),
+				QStringLiteral("OBS no pudo iniciar la salida Enhanced Broadcasting de Twitch.\n\nDetalle: %1")
+					.arg(last_error));
 			return false;
 		}
 
