@@ -48,7 +48,7 @@ void SetObject(obs_data_t *parent, const char *name, obs_data_t *child)
 	obs_data_release(child);
 }
 
-obs_data_t *CreateGoLiveRequest(const char *stream_key)
+obs_data_t *CreateGoLiveRequest(const char *stream_key, const std::vector<obs_canvas_t *> &canvas_list)
 {
 	static constexpr const char *skeleton =
 		"{"
@@ -207,32 +207,47 @@ obs_data_t *CreateGoLiveRequest(const char *stream_key)
 		// OBS 31 exposes the base audio format but not the newer buffering fields.
 	}
 
-	obs_video_info video = {};
-	if (obs_get_video_info(&video)) {
-		obs_data_set_int(preferences, "composition_gpu_index", video.adapter);
+	obs_video_info main_video = {};
+	if (!canvas_list.empty() && obs_canvas_get_video_info(canvas_list.front(), &main_video)) {
+		obs_data_set_int(preferences, "composition_gpu_index", main_video.adapter);
 		obs_data_array_t *canvases = obs_data_array_create();
-		obs_data_t *canvas = obs_data_create();
-		obs_data_set_int(canvas, "width", video.output_width);
-		obs_data_set_int(canvas, "height", video.output_height);
-		obs_data_set_int(canvas, "canvas_width", video.base_width);
-		obs_data_set_int(canvas, "canvas_height", video.base_height);
-		obs_data_t *fps = obs_data_create();
-		obs_data_set_int(fps, "numerator", video.fps_num);
-		obs_data_set_int(fps, "denominator", video.fps_den);
-		SetObject(canvas, "framerate", fps);
-		obs_data_array_push_back(canvases, canvas);
-		obs_data_release(canvas);
+		for (size_t i = 0; i < canvas_list.size(); ++i) {
+			obs_video_info video = {};
+			obs_canvas_t *canvas_ref = canvas_list[i];
+			if (!canvas_ref || !obs_canvas_get_video_info(canvas_ref, &video)) {
+				blog(LOG_WARNING, "[Aitum EBC] Skipping canvas[%zu] because OBS has no video info for it", i);
+				continue;
+			}
+			obs_data_t *canvas = obs_data_create();
+			obs_data_set_int(canvas, "width", video.output_width);
+			obs_data_set_int(canvas, "height", video.output_height);
+			obs_data_set_int(canvas, "canvas_width", video.base_width);
+			obs_data_set_int(canvas, "canvas_height", video.base_height);
+			obs_data_t *fps = obs_data_create();
+			obs_data_set_int(fps, "numerator", video.fps_num);
+			obs_data_set_int(fps, "denominator", video.fps_den);
+			SetObject(canvas, "framerate", fps);
+			obs_data_array_push_back(canvases, canvas);
+			obs_data_release(canvas);
+			blog(LOG_INFO, "[Aitum EBC] Twitch request canvas[%zu]: %s, output=%ux%u, base=%ux%u, fps=%u/%u",
+			     i, obs_canvas_get_name(canvas_ref) ? obs_canvas_get_name(canvas_ref) : "(unnamed)",
+			     video.output_width, video.output_height, video.base_width, video.base_height,
+			     video.fps_num, video.fps_den);
+		}
 		obs_data_set_array(preferences, "canvases", canvases);
 		obs_data_array_release(canvases);
+	} else {
+		blog(LOG_ERROR, "[Aitum EBC] Cannot build Twitch configuration request without a valid main canvas");
 	}
 	SetObject(root, "preferences", preferences);
 
 	return root;
 }
 
-bool DownloadConfiguration(const char *stream_key, obs_data_t **response, QString &error)
+bool DownloadConfiguration(const char *stream_key, const std::vector<obs_canvas_t *> &canvases,
+			   obs_data_t **response, QString &error)
 {
-	obs_data_t *request = CreateGoLiveRequest(stream_key);
+	obs_data_t *request = CreateGoLiveRequest(stream_key, canvases);
 	if (!request) {
 		error = QStringLiteral("No se pudo preparar la solicitud de configuración de Twitch.");
 		return false;
@@ -383,8 +398,8 @@ void ReleaseTwitchEnhancedBroadcastingOutput(obs_output_t *output)
 }
 
 bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char *stream_server,
-					    const char *stream_key, obs_output_t **output,
-					    TwitchEbcEncoderGroup &encoder_group, QString &error)
+					    const char *stream_key, obs_canvas_t *vertical_canvas,
+					    obs_output_t **output, TwitchEbcEncoderGroup &encoder_group, QString &error)
 {
 	if (!output || !stream_server || !stream_key || !stream_key[0]) {
 		error = QStringLiteral("Falta el servidor o la clave de transmisión de Twitch.");
@@ -392,8 +407,33 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 	}
 	*output = nullptr;
 
+	// Keep the canvas references alive while Twitch's configuration is requested
+	// and the matching per-canvas encoders are created.
+	using CanvasRef = std::unique_ptr<obs_canvas_t, decltype(&obs_canvas_release)>;
+	CanvasRef main_canvas(obs_get_main_canvas(), obs_canvas_release);
+	if (!main_canvas) {
+		error = QStringLiteral("No se pudo acceder al canvas principal de OBS.");
+		return false;
+	}
+	CanvasRef vertical_canvas(vertical_canvas ? obs_canvas_get_ref(vertical_canvas) : nullptr, obs_canvas_release);
+	std::vector<obs_canvas_t *> canvases{main_canvas.get()};
+	if (vertical_canvas && vertical_canvas.get() != main_canvas.get()) {
+		obs_video_info vertical_info = {};
+		if (obs_canvas_get_video(vertical_canvas.get()) &&
+		    obs_canvas_get_video_info(vertical_canvas.get(), &vertical_info) &&
+		    vertical_info.base_height > vertical_info.base_width) {
+			canvases.push_back(vertical_canvas.get());
+			blog(LOG_INFO, "[Aitum EBC] Including vertical canvas '%s' (%ux%u)",
+			     obs_canvas_get_name(vertical_canvas.get()), vertical_info.base_width, vertical_info.base_height);
+		} else {
+			blog(LOG_WARNING, "[Aitum EBC] Vertical canvas was found but has no usable portrait video output; using horizontal only");
+			vertical_canvas.reset();
+		}
+	}
+	blog(LOG_INFO, "[Aitum EBC] Requesting Twitch configuration with %zu canvas(es)", canvases.size());
+
 	obs_data_t *configuration = nullptr;
-	if (!DownloadConfiguration(stream_key, &configuration, error)) {
+	if (!DownloadConfiguration(stream_key, canvases, &configuration, error)) {
 		return false;
 	}
 
@@ -541,16 +581,6 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		return false;
 	}
 
-	// Bind Twitch's encoders to OBS's primary (horizontal) video output.
-	video_t *main_video = obs_get_video();
-	obs_video_info video = {};
-	if (!main_video || !obs_get_video_info(&video)) {
-		ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
-		obs_data_array_release(video_configs);
-		obs_data_release(configuration);
-		error = QStringLiteral("No se pudo acceder al canvas principal de OBS para crear los encoders de Twitch.");
-		return false;
-	}
 	for (size_t i = 0; i < video_count; ++i) {
 		obs_data_t *encoder_config = obs_data_array_item(video_configs, i);
 		const char *encoder_type = obs_data_get_string(encoder_config, "type");
@@ -579,9 +609,39 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 			error = QStringLiteral("OBS no pudo crear uno de los encoders de vídeo solicitados por Twitch.");
 			return false;
 		}
-		obs_encoder_set_video(encoder, main_video);
+		const long long canvas_index_value = obs_data_get_int(encoder_config, "canvas_index");
+		if (canvas_index_value < 0 || static_cast<size_t>(canvas_index_value) >= canvases.size()) {
+			blog(LOG_ERROR, "[Aitum EBC] Twitch encoder[%zu] references unavailable canvas_index=%lld (canvas count=%zu)",
+			     i, canvas_index_value, canvases.size());
+			obs_encoder_release(encoder);
+			obs_data_release(encoder_config);
+			ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
+			obs_data_array_release(video_configs);
+			obs_data_release(configuration);
+			error = QStringLiteral("Twitch pidió un canvas que no está disponible en OBS (canvas_index=%1).")
+					.arg(canvas_index_value);
+			return false;
+		}
+		const size_t canvas_index = static_cast<size_t>(canvas_index_value);
+		obs_canvas_t *encoder_canvas = canvases[canvas_index];
+		video_t *encoder_video = obs_canvas_get_video(encoder_canvas);
+		obs_video_info video = {};
+		if (!encoder_video || !obs_canvas_get_video_info(encoder_canvas, &video)) {
+			blog(LOG_ERROR, "[Aitum EBC] Canvas %zu ('%s') has no usable video output for encoder[%zu]",
+			     canvas_index, obs_canvas_get_name(encoder_canvas), i);
+			obs_encoder_release(encoder);
+			obs_data_release(encoder_config);
+			ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
+			obs_data_array_release(video_configs);
+			obs_data_release(configuration);
+			error = QStringLiteral("OBS no pudo acceder al vídeo del canvas solicitado por Twitch.");
+			return false;
+		}
 		const uint32_t width = (uint32_t)obs_data_get_int(encoder_config, "width");
 		const uint32_t height = (uint32_t)obs_data_get_int(encoder_config, "height");
+		blog(LOG_INFO, "[Aitum EBC] Encoder[%zu] -> canvas[%zu] '%s', %ux%u",
+		     i, canvas_index, obs_canvas_get_name(encoder_canvas), width, height);
+		obs_encoder_set_video(encoder, encoder_video);
 		if (!width || !height) {
 			obs_encoder_release(encoder);
 			obs_data_release(encoder_config);
