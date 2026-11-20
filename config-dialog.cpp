@@ -620,13 +620,24 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 	audioPage->setLayout(audioPageLayout);
 
 	const bool main = outputsLayout == mainOutputsLayout;
+	static constexpr char TWITCH_EBC_VERTICAL_ENCODER[] = "__aitum_twitch_ebc_vertical__";
+	if (!main) {
+		// Migrate the previous per-output checkbox to the new encoder dropdown.
+		if (obs_data_has_user_value(settings, "use_twitch_ebc_encoder")) {
+			if (obs_data_get_bool(settings, "use_twitch_ebc_encoder"))
+				obs_data_set_string(settings, "video_encoder", TWITCH_EBC_VERTICAL_ENCODER);
+		} else if (!obs_data_has_user_value(settings, "video_encoder")) {
+			// New vertical destinations default to shared EBC, with an independent
+			// fallback at runtime whenever Twitch EBC is not active.
+			obs_data_set_string(settings, "video_encoder", TWITCH_EBC_VERTICAL_ENCODER);
+		}
+	}
 
 	// VIDEO ENCODER
 	auto videoEncoder = new QComboBox;
 	videoEncoder->addItem(QString::fromUtf8(obs_module_text(main ? "MainEncoder" : "VerticalEncoder")),
 			      QVariant(QString::fromUtf8("")));
 
-	static constexpr char TWITCH_EBC_VERTICAL_ENCODER[] = "__aitum_twitch_ebc_vertical__";
 	if (!main) {
 		videoEncoder->addItem(QString::fromUtf8(obs_module_text("TwitchEbcVerticalEncoder")),
 				      QVariant(QString::fromUtf8(TWITCH_EBC_VERTICAL_ENCODER)));
