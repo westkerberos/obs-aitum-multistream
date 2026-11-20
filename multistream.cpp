@@ -956,8 +956,8 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 		blog(LOG_INFO, "[Aitum EBC] Preflight service: type=%s can_try=%s server_present=%s",
 		     service_type ? service_type : "(null)", service_ready ? "true" : "false",
 		     service_url && service_url[0] ? "true" : "false");
-		if (ebc_service)
-			obs_service_release(ebc_service);
+		// obs_output_get_service returns a borrowed pointer. Do not release it
+		// here; the EBC output keeps the service alive until output teardown.
 
 		size_t video_encoder_count = 0;
 		size_t audio_encoder_count = 0;
@@ -991,7 +991,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 		     video_encoder_count, audio_encoder_count);
 
 		auto fail_ebc_preflight = [this, ebc_output](const QString &detail) {
-			obs_output_release(ebc_output);
+			ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 			QMessageBox::warning(this, QStringLiteral("Twitch Enhanced Broadcasting"),
 					     QStringLiteral("No se pudo preparar Enhanced Broadcasting.\n\nDiagnóstico: %1")
 						     .arg(detail));
@@ -1073,7 +1073,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 
 			signal_handler_disconnect(ebc_signal, "start", stream_output_start, this);
 			signal_handler_disconnect(ebc_signal, "stop", stream_output_stop, this);
-			obs_output_release(ebc_output);
+			ReleaseTwitchEnhancedBroadcastingOutput(ebc_output);
 			QMessageBox::warning(
 				this, QStringLiteral("Twitch Enhanced Broadcasting"),
 				QStringLiteral("OBS no pudo iniciar la salida Enhanced Broadcasting de Twitch.\n\nDetalle: %1")
@@ -1331,9 +1331,13 @@ void MultistreamDock::stream_output_stop(void *data, calldata_t *calldata)
 				Qt::QueuedConnection);
 		}
 		const std::string output_settings_name = std::get<std::string>(*it);
+		const bool is_ebc = md->enhanced_encoder_groups.find(output_settings_name) != md->enhanced_encoder_groups.end();
 		if (!md->exiting) {
-			QMetaObject::invokeMethod(button, [output, md, output_settings_name] {
-				obs_output_release(output);
+			QMetaObject::invokeMethod(button, [output, md, output_settings_name, is_ebc] {
+				if (is_ebc)
+					ReleaseTwitchEnhancedBroadcastingOutput(output);
+				else
+					obs_output_release(output);
 				md->enhanced_encoder_groups.erase(output_settings_name);
 			}, Qt::QueuedConnection);
 		} else {
