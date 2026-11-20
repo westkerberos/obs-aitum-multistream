@@ -547,7 +547,80 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 
 	serverLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 	serverLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+
+	// Title
+	auto server_title_layout = new QHBoxLayout;
+
+	auto platformIconLabel = new QLabel;
+	auto platformIcon =
+		ConfigUtils::getPlatformIconFromEndpoint(QString::fromUtf8(obs_data_get_string(settings, "stream_server")));
+	platformIconLabel->setPixmap(platformIcon.pixmap(36, 36));
+	server_title_layout->addWidget(platformIconLabel, 0);
+
+	const bool expanded = obs_data_get_bool(settings, "expanded");
+
+	auto streaming_title = new QToolButton;
+	streaming_title->setText(QString::fromUtf8(obs_data_get_string(settings, "name")));
+	streaming_title->setStyleSheet(QString("QToolButton{background-color: %1;font-weight: bold;border: none;}")
+					       .arg(palette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb)));
+	streaming_title->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
+	streaming_title->setArrowType(expanded ? Qt::ArrowType::DownArrow : Qt::ArrowType::RightArrow);
+	streaming_title->setCheckable(true);
+	streaming_title->setChecked(expanded);
+	server_title_layout->addWidget(streaming_title, 1, Qt::AlignLeft);
+
+	// Advanced settings
+	const bool advanced = obs_data_get_bool(settings, "advanced");
+	auto advancedGroup = new QGroupBox;
+	advancedGroup->setContentsMargins(0, 4, 0, 0);
+
+	advancedGroup->setProperty("customTitle", QVariant(true));
+	advancedGroup->setStyleSheet(
+		"QGroupBox[customTitle=\"true\"]::title { subcontrol-origin: margin; subcontrol-position: top right; padding: 12px 18px 0 0; }"
+		"QGroupBox[customTitle=\"true\"] { padding-top: 4px; padding-bottom: 0;}");
+	if (!expanded)
+		advancedGroup->setVisible(false);
+
+	auto advancedGroupLayout = new QVBoxLayout;
+	advancedGroup->setLayout(advancedGroupLayout);
+
+	// Tab widget
+	// 1 = bg for active tab + pane, 2 = inactive tabs, 3 = tab text colour, 4 = border colour for pane
+	auto tabStyles =
+		QString("QTabWidget::pane {  background: %1; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; border-top-right-radius: 4px; margin-top: -1px; padding-top: 8px; border: 1px solid %4; } QTabWidget::tab-bar { margin-bottom: 0; padding-bottom: 0; border-color: %4; } QTabBar::tab { color: %3; padding: 10px; margin-bottom: 0; border: 1px solid %4; } QTabBar::tab:selected { background: %1; font-weight: bold; border-bottom: none; } QTabBar::tab:!selected { background: %2; }")
+			.arg(palette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb),
+			     palette().color(QPalette::ColorRole::Light).name(QColor::HexRgb),
+			     palette().color(QPalette::ColorRole::Text).name(QColor::HexRgb),
+			     palette().color(QPalette::ColorRole::Light).name(QColor::HexRgb));
+
+	auto advancedTabWidget = new QTabWidget;
+	advancedTabWidget->setContentsMargins(0, 0, 0, 0);
+	advancedTabWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	advancedTabWidget->setStyleSheet(tabStyles);
+	//	advancedTabWidget->setStyleSheet("QTabWidget::tab-bar { border: 1px solid gray; }"
+	//									 "QTabBar::tab { background: gray; color: white; padding: 10px; }"
+	//									 "QTabBar::tab:selected { background: lightgray; }"
+	//									 "QTabWidget::pane { border: none; background: pink; }");
+
+	//	auto pageStyle = QString("QWidget[page=\"true\"] { border: 1px solid %1; padding-top: 0; margin-top: 0; }")
+	//					.arg(QPalette().color(QPalette::ColorRole::Mid).name(QColor::HexRgb));
+	//
+	auto videoPage = new QWidget;
+	videoPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	//	videoPage->setStyleSheet(pageStyle);
+	//	videoPage->setProperty("page", true);
+	auto videoPageLayout = new QFormLayout;
+	videoPage->setLayout(videoPageLayout);
+
+	auto audioPage = new QWidget;
+	audioPage->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	//	audioPage->setStyleSheet(pageStyle);
+	//	audioPage->setProperty("page", true);
+	auto audioPageLayout = new QFormLayout;
+	audioPage->setLayout(audioPageLayout);
+
 	const bool main = outputsLayout == mainOutputsLayout;
+
 	// VIDEO ENCODER
 	auto videoEncoder = new QComboBox;
 	videoEncoder->addItem(QString::fromUtf8(obs_module_text(main ? "MainEncoder" : "VerticalEncoder")),
