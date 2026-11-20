@@ -514,8 +514,8 @@ MultistreamDock::~MultistreamDock()
 		}
 		if (!exiting) {
 			obs_output_release(old);
+			obs_service_release(service);
 		}
-		obs_service_release(service);
 	}
 	outputs.clear();
 	obs_data_array_release(vertical_outputs);
