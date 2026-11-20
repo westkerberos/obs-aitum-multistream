@@ -9,6 +9,8 @@
 #include <QString>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <map>
+#include <memory>
 
 class OBSBasicSettings;
 
@@ -38,6 +40,8 @@ private:
 	std::vector<video_t *> oldVideo;
 
 	std::vector<std::tuple<std::string, obs_output_t *, QPushButton *>> outputs;
+	std::map<std::string, std::shared_ptr<obs_encoder_group_t>> enhanced_encoder_groups;
+	std::map<std::string, std::shared_ptr<obs_canvas_t>> enhanced_encoder_canvases;
 	obs_data_array_t *vertical_outputs = nullptr;
 	bool exiting = false;
 	bool finished_loading = false;

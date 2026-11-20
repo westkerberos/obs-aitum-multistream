@@ -57,6 +57,7 @@ private:
 	QStringList otherNames;
 	bool verticalCanvasTarget = false;
 	bool tiktokTarget = false;
+	bool twitchEnhancedBroadcasting = false;
 	obs_data_t *tiktokSettings = nullptr;
 
 	bool ConfigureVerticalTikTok(QWidget *parent);
@@ -72,5 +73,6 @@ public:
 	QString outputServer;
 	QString outputKey;
 	bool IsVerticalTikTokTarget() const { return verticalCanvasTarget && tiktokTarget; }
+	bool TwitchEnhancedBroadcastingEnabled() const { return twitchEnhancedBroadcasting; }
 	obs_data_t *TikTokSettings() const { return tiktokSettings; }
 };

@@ -46,6 +46,9 @@ if(BUILD_OUT_OF_TREE)
   find_package(CURL REQUIRED)
 endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE CURL::libcurl)
+if(OS_WINDOWS)
+  target_link_libraries(${PROJECT_NAME} PRIVATE dxgi)
+endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in ${CMAKE_CURRENT_SOURCE_DIR}/version.h)
 
@@ -59,6 +62,7 @@ target_sources(${PROJECT_NAME} PRIVATE
   output-dialog.cpp
   stream-key-input.cpp
   multistream.cpp
+  twitch-ebc.cpp
   file-updater.c
 	resources.qrc
 	config-dialog.hpp
@@ -66,6 +70,7 @@ target_sources(${PROJECT_NAME} PRIVATE
 	output-dialog.hpp
 	stream-key-input.hpp
     multistream.hpp
+  twitch-ebc.hpp
 	file-updater.h)
 
 if(BUILD_OUT_OF_TREE)
