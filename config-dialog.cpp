@@ -547,6 +547,7 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 
 	serverLayout->setFieldGrowthPolicy(QFormLayout::AllNonFixedFieldsGrow);
 	serverLayout->setLabelAlignment(Qt::AlignRight | Qt::AlignTrailing | Qt::AlignVCenter);
+	const bool main = outputsLayout == mainOutputsLayout;
 	// VIDEO ENCODER
 	auto videoEncoder = new QComboBox;
 	videoEncoder->addItem(QString::fromUtf8(obs_module_text(main ? "MainEncoder" : "VerticalEncoder")),
