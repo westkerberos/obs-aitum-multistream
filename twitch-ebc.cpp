@@ -415,19 +415,20 @@ bool CreateTwitchEnhancedBroadcastingOutput(const char *output_name, const char 
 		error = QStringLiteral("No se pudo acceder al canvas principal de OBS.");
 		return false;
 	}
-	CanvasRef vertical_canvas(vertical_canvas ? obs_canvas_get_ref(vertical_canvas) : nullptr, obs_canvas_release);
+	CanvasRef vertical_canvas_ref(vertical_canvas ? obs_canvas_get_ref(vertical_canvas) : nullptr,
+				      obs_canvas_release);
 	std::vector<obs_canvas_t *> canvases{main_canvas.get()};
-	if (vertical_canvas && vertical_canvas.get() != main_canvas.get()) {
+	if (vertical_canvas_ref && vertical_canvas_ref.get() != main_canvas.get()) {
 		obs_video_info vertical_info = {};
-		if (obs_canvas_get_video(vertical_canvas.get()) &&
-		    obs_canvas_get_video_info(vertical_canvas.get(), &vertical_info) &&
+		if (obs_canvas_get_video(vertical_canvas_ref.get()) &&
+		    obs_canvas_get_video_info(vertical_canvas_ref.get(), &vertical_info) &&
 		    vertical_info.base_height > vertical_info.base_width) {
-			canvases.push_back(vertical_canvas.get());
+			canvases.push_back(vertical_canvas_ref.get());
 			blog(LOG_INFO, "[Aitum EBC] Including vertical canvas '%s' (%ux%u)",
-			     obs_canvas_get_name(vertical_canvas.get()), vertical_info.base_width, vertical_info.base_height);
+			     obs_canvas_get_name(vertical_canvas_ref.get()), vertical_info.base_width, vertical_info.base_height);
 		} else {
 			blog(LOG_WARNING, "[Aitum EBC] Vertical canvas was found but has no usable portrait video output; using horizontal only");
-			vertical_canvas.reset();
+			vertical_canvas_ref.reset();
 		}
 	}
 	blog(LOG_INFO, "[Aitum EBC] Requesting Twitch configuration with %zu canvas(es)", canvases.size());
