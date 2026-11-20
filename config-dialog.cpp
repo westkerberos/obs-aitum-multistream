@@ -626,6 +626,7 @@ void OBSBasicSettings::AddServer(QFormLayout *outputsLayout, obs_data_t *setting
 		if (obs_data_has_user_value(settings, "use_twitch_ebc_encoder")) {
 			if (obs_data_get_bool(settings, "use_twitch_ebc_encoder"))
 				obs_data_set_string(settings, "video_encoder", TWITCH_EBC_VERTICAL_ENCODER);
+			obs_data_unset_user_value(settings, "use_twitch_ebc_encoder");
 		} else if (!obs_data_has_user_value(settings, "video_encoder")) {
 			// New vertical destinations default to shared EBC, with an independent
 			// fallback at runtime whenever Twitch EBC is not active.
