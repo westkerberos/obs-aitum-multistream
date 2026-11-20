@@ -945,17 +945,129 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 					     preserve_delay ? OBS_OUTPUT_DELAY_PRESERVE : 0);
 		}
 
+		// Diagnose the synchronous gates in OBS's RTMP startup path. The stock
+		// RTMP output can return false without setting last_error at these gates.
+		obs_service_t *ebc_service = obs_output_get_service(ebc_output);
+		const bool service_ready = ebc_service && obs_service_can_try_to_connect(ebc_service);
+		const char *service_type = ebc_service ? obs_service_get_type(ebc_service) : nullptr;
+		const char *service_url = ebc_service
+						  ? obs_service_get_connect_info(ebc_service, OBS_SERVICE_CONNECT_INFO_SERVER_URL)
+						  : nullptr;
+		blog(LOG_INFO, "[Aitum EBC] Preflight service: type=%s can_try=%s server_present=%s",
+		     service_type ? service_type : "(null)", service_ready ? "true" : "false",
+		     service_url && service_url[0] ? "true" : "false");
+		if (ebc_service)
+			obs_service_release(ebc_service);
+
+		size_t video_encoder_count = 0;
+		size_t audio_encoder_count = 0;
+		for (size_t i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; ++i) {
+			obs_encoder_t *encoder = obs_output_get_video_encoder2(ebc_output, i);
+			if (!encoder)
+				continue;
+			++video_encoder_count;
+			const char *encoder_name = obs_encoder_get_name(encoder);
+			const char *encoder_id = obs_encoder_get_id(encoder);
+			const char *codec = obs_encoder_get_codec(encoder);
+			const char *encoder_error = obs_encoder_get_last_error(encoder);
+			blog(LOG_INFO, "[Aitum EBC] Video encoder[%zu]: name=%s id=%s codec=%s last_error=%s",
+			     i, encoder_name ? encoder_name : "(null)", encoder_id ? encoder_id : "(null)",
+			     codec ? codec : "(null)", encoder_error && encoder_error[0] ? encoder_error : "(none)");
+		}
+		for (size_t i = 0; i < MAX_OUTPUT_AUDIO_ENCODERS; ++i) {
+			obs_encoder_t *encoder = obs_output_get_audio_encoder(ebc_output, i);
+			if (!encoder)
+				continue;
+			++audio_encoder_count;
+			const char *encoder_name = obs_encoder_get_name(encoder);
+			const char *encoder_id = obs_encoder_get_id(encoder);
+			const char *codec = obs_encoder_get_codec(encoder);
+			const char *encoder_error = obs_encoder_get_last_error(encoder);
+			blog(LOG_INFO, "[Aitum EBC] Audio encoder[%zu]: name=%s id=%s codec=%s last_error=%s",
+			     i, encoder_name ? encoder_name : "(null)", encoder_id ? encoder_id : "(null)",
+			     codec ? codec : "(null)", encoder_error && encoder_error[0] ? encoder_error : "(none)");
+		}
+		blog(LOG_INFO, "[Aitum EBC] Encoder counts: video=%zu audio=%zu",
+		     video_encoder_count, audio_encoder_count);
+
+		auto fail_ebc_preflight = [this, ebc_output](const QString &detail) {
+			obs_output_release(ebc_output);
+			QMessageBox::warning(this, QStringLiteral("Twitch Enhanced Broadcasting"),
+					     QStringLiteral("No se pudo preparar Enhanced Broadcasting.\\n\\nDiagnóstico: %1")
+						     .arg(detail));
+			return false;
+		};
+
+		if (!service_ready) {
+			const QString detail =
+				QStringLiteral("El servicio RTMP personalizado de OBS no está listo para conectar (server vacío o servicio no disponible).");
+			blog(LOG_ERROR, "[Aitum EBC] Preflight failed: %s", detail.toUtf8().constData());
+			return fail_ebc_preflight(detail);
+		}
+
+		const bool can_begin = obs_output_can_begin_data_capture(ebc_output, 0);
+		blog(LOG_INFO, "[Aitum EBC] Preflight obs_output_can_begin_data_capture: %s",
+		     can_begin ? "true" : "false");
+		if (!can_begin) {
+			const QString detail =
+				QStringLiteral("OBS no puede iniciar la captura: encoders de vídeo=%1, encoders de audio=%2. Revisá las líneas Video encoder y Audio encoder del registro.")
+					.arg(video_encoder_count)
+					.arg(audio_encoder_count);
+			blog(LOG_ERROR, "[Aitum EBC] Preflight failed: %s", detail.toUtf8().constData());
+			return fail_ebc_preflight(detail);
+		}
+
+		// This initializes each encoder once here; OBS's RTMP start path calls
+		// the same API again, which is idempotent for initialized encoders.
+		if (!obs_output_initialize_encoders(ebc_output, 0)) {
+			QString detail;
+			const char *output_error = obs_output_get_last_error(ebc_output);
+			if (output_error && output_error[0])
+				detail = QString::fromUtf8(output_error);
+			for (size_t i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; ++i) {
+				obs_encoder_t *encoder = obs_output_get_video_encoder2(ebc_output, i);
+				if (!encoder)
+					continue;
+				const char *encoder_error = obs_encoder_get_last_error(encoder);
+				if (encoder_error && encoder_error[0]) {
+					if (!detail.isEmpty())
+						detail += QStringLiteral("\\n");
+					detail += QStringLiteral("Vídeo %1: %2")
+							  .arg(i)
+							  .arg(QString::fromUtf8(encoder_error));
+				}
+			}
+			for (size_t i = 0; i < MAX_OUTPUT_AUDIO_ENCODERS; ++i) {
+				obs_encoder_t *encoder = obs_output_get_audio_encoder(ebc_output, i);
+				if (!encoder)
+					continue;
+				const char *encoder_error = obs_encoder_get_last_error(encoder);
+				if (encoder_error && encoder_error[0]) {
+					if (!detail.isEmpty())
+						detail += QStringLiteral("\\n");
+					detail += QStringLiteral("Audio %1: %2")
+							  .arg(i)
+							  .arg(QString::fromUtf8(encoder_error));
+				}
+			}
+			if (detail.isEmpty())
+				detail = QStringLiteral("OBS rechazó la inicialización de los encoders, pero no devolvió un texto de error. Revisá los mensajes [obs-nvenc] y [Aitum EBC] del registro.");
+			blog(LOG_ERROR, "[Aitum EBC] Preflight obs_output_initialize_encoders failed: %s",
+			     detail.toUtf8().constData());
+			return fail_ebc_preflight(detail);
+		}
+
+		blog(LOG_INFO, "[Aitum EBC] Preflight passed: service, capture prerequisites and encoder initialization are OK.");
+
 		signal_handler_t *ebc_signal = obs_output_get_signal_handler(ebc_output);
 		signal_handler_connect(ebc_signal, "start", stream_output_start, this);
 		signal_handler_connect(ebc_signal, "stop", stream_output_stop, this);
 		if (!obs_output_start(ebc_output)) {
-			// Keep the encoder/output error before releasing the output. OBS 33
-			// exposes encoder initialization failures through this accessor.
 			const char *last_error_raw = obs_output_get_last_error(ebc_output);
 			const QString last_error =
 				last_error_raw && last_error_raw[0]
 					? QString::fromUtf8(last_error_raw)
-					: QStringLiteral("OBS no informó un error interno del encoder o de la conexión.");
+					: QStringLiteral("La validación del servicio y la inicialización de los encoders pasaron. OBS falló después, dentro del inicio RTMP o de la ruta de delay.");
 			blog(LOG_ERROR, "[Aitum EBC] obs_output_start failed for '%s': %s",
 			     name, last_error.toUtf8().constData());
 
@@ -964,7 +1076,7 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 			obs_output_release(ebc_output);
 			QMessageBox::warning(
 				this, QStringLiteral("Twitch Enhanced Broadcasting"),
-				QStringLiteral("OBS no pudo iniciar la salida Enhanced Broadcasting de Twitch.\n\nDetalle: %1")
+				QStringLiteral("OBS no pudo iniciar la salida Enhanced Broadcasting de Twitch.\\n\\nDetalle: %1")
 					.arg(last_error));
 			return false;
 		}
