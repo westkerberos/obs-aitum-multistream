@@ -83,6 +83,8 @@ public:
 	~MultistreamDock();
 	void LoadVerticalOutputs(bool firstLoad = true);
 	void LoadWebsocket();
+	// Returns a referenced Twitch EBC encoder matching the supplied canvas video, or nullptr.
+	obs_encoder_t *GetTwitchEnhancedBroadcastingEncoder(video_t *canvas_video);
 };
 
 class AspectRatioPixmapLabel : public QLabel {
