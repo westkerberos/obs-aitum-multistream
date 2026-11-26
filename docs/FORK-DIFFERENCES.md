@@ -6,7 +6,7 @@ This repository is based on [Aitum/obs-aitum-multistream](https://github.com/Ait
 
 ## WEST Gaming additions
 
-The TikTok destination integration is in [PR #1](https://github.com/westkerberos/obs-aitum-multistream/pull/1), branch `feature/tiktok-vertical-target`.
+The TikTok destination integration is in [PR #1](https://github.com/westkerberos/obs-aitum-multistream/pull/2), branch `feature/aitum-twitch-enhanced-broadcasting`.
 
 ### Output wizard changes
 
@@ -60,6 +60,9 @@ The fork is based on [Aitum/obs-aitum-multistream](https://github.com/Aitum/obs-
 The source-code additions are intentionally small compared with the Vertical Canvas TikTok implementation. The key changes are the Vertical Canvas-aware target creation/edit path in `config-dialog.cpp`, TikTok wizard and proc-handler bridge in `output-dialog.cpp/.hpp`, and TikTok target identification in `multistream.cpp`, plus Windows-only workflow configuration and this documentation.
 
 A comparison against Aitum's upstream `main` shows the feature branch ahead and not behind. The exact ahead count includes inherited branch history and changes as documentation commits are added; the PR file list is the more useful measure of the actual Multistream bridge change.
+
+
+For the complete Twitch EBC + portrait encoder reuse + native TikTok design and current compatibility matrix, see the [WEST Gaming Streaming Stack — Source of Truth](https://github.com/westkerberos/obs-vertical-canvas/blob/feature/tiktok-native-ebc-combined/docs/WEST-GAMING-STREAMING-STACK.md) and [Twitch EBC and stack integration](TWITCH-EBC-AND-STACK-INTEGRATION.md).
 
 ## Build and test status
 
