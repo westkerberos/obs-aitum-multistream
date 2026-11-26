@@ -43,13 +43,16 @@ Main Canvas output creation/editing remains on the original Aitum path. The TikT
 
 Dual LIVE is controlled by the Vertical Canvas destination configuration. In the matching implementation, its default mode reuses the existing Vertical Canvas output encoders for Portrait and the active OBS Main Canvas streaming encoders for Landscape. An active Main Canvas stream is therefore required before starting automatic Dual LIVE.
 
-The Multistream UI does not configure separate encoders for each layout, create the second TikTok ingest feed or manage the second output transport. Vertical Canvas owns all of that. See [the Vertical Canvas Dual LIVE guide](https://github.com/westkerberos/obs-vertical-canvas/blob/feature/tiktok-native-output/docs/TIKTOK-LIVE.md#dual-live-portrait--landscape).
+The Multistream UI does not configure separate encoders for each layout, create the second TikTok ingest feed or manage the second output transport. Vertical Canvas owns all of that. See [the Vertical Canvas Dual LIVE guide](https://github.com/westkerberos/obs-vertical-canvas/blob/feature/tiktok-native-ebc-combined/docs/TIKTOK-LIVE.md#dual-live-portrait--landscape).
 
 ## Persistence and compatibility
 
 Provider-specific settings are stored with the named Vertical Canvas destination. When Multistream updates/rebuilds its vertical output list, the TikTok fields must be preserved for the matching destination; editing a target must not silently replace its credentials or Dual LIVE configuration.
 
 Use matching builds of both plugins. The Vertical Canvas bridge contract is currently named `aitum_vertical_configure_tiktok_output`; changing that proc-handler signature/name requires coordinated changes in both repositories.
+
+
+For the complete Twitch EBC + portrait encoder reuse + native TikTok design and current compatibility matrix, see the [WEST Gaming Streaming Stack — Source of Truth](https://github.com/westkerberos/obs-vertical-canvas/blob/feature/tiktok-native-ebc-combined/docs/WEST-GAMING-STREAMING-STACK.md) and [Twitch EBC and stack integration](TWITCH-EBC-AND-STACK-INTEGRATION.md).
 
 ## Troubleshooting
 
