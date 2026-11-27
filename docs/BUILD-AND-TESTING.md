@@ -7,7 +7,7 @@
 
 The merged main branch provides Main Canvas destination orchestration, Twitch EBC and the TikTok configuration bridge. It must be paired with [WEST Vertical Canvas 1.6.8](https://github.com/westkerberos/obs-vertical-canvas/tree/main), which owns vertical outputs, the EBC portrait video-encoder reuse and the TikTok runtime/Dual LIVE.
 
-The end-to-end ownership map, encoder routes and paired test matrix are maintained in the [WEST Gaming Streaming Stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/WEST-GAMING-STREAMING-STACK.md).
+The end-to-end ownership map, encoder routes and paired test matrix are maintained in the [WEST Gaming Streaming Stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/WEST-GAMING-STREAMING-STACK.md). For a new ChatGPT conversation, use the [next-chat handoff](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/NEW-CHAT-START-HERE.md).
 
 ## Build configuration and upstream integration
 
@@ -26,7 +26,10 @@ Do not replace this fork with the official Aitum binary; it does not include the
 - Branch: main
 - Commit: `6d4c0922f60ddd0012778c69dc7584a0cef55d15`.
 - Result: **success** (Windows x64 build/package).
-- Artifact: `aitum-multistream-1.0.10-windows-x64-6d4c0922f`.
+- Artifact: `aitum-multistream-1.0.10-windows-x64-6d4c0922f` (artifact ID `15219040196`).
+- Outer Actions ZIP SHA-256: `f2d08b6b0832c336e80e4e65eb5a9dfc6f7f679f4c2ae3104d1273441c440d04`.
+- ProgramData ZIP SHA-256: `5b16036008d5cb6781880c0dfd493e84a5c8c5512f2aeaec7b19b6bd6a1e69c3`.
+- DLL SHA-256: `47a39f4236282b1bfbd58d28b22dd74ed6f1072446d63baabf4d1a891ddbe0a3`.
 - Ubuntu/macOS and formatting: skipped by the current Windows-only workflow.
 
 This establishes compilation/packaging against OBS 33.0.3 sources. It does not by itself prove Twitch EBC negotiation, track assignment, OBS encoder identity/reuse, TikTok session startup or long-duration stability.
