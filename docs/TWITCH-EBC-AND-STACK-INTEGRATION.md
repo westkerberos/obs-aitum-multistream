@@ -33,6 +33,8 @@ When an EBC-enabled Twitch destination starts, Multistream:
 
 The ordinary OBS Main Canvas stream is not converted into the EBC output; EBC is a separate Multistream-managed Twitch output.
 
+**Current WEST Gaming profile routing:** the Main Canvas horizontal stream is YouTube Horizontal. TikTok Dual LIVE Landscape reuses that active Main Canvas output's video/audio encoders; the observed 2560×1440 HEVC/H.265 25 Mbps encoder is therefore the YouTube/Main Canvas encoder, not Twitch. TikTok Portrait can separately reuse the portrait encoder in Twitch EBC's dedicated encoder group. Never conflate the YouTube Main Canvas encoder with the independently negotiated Twitch EBC encoders.
+
 ## Vertical destinations and portrait encoder reuse
 
 Vertical Canvas searches active OBS outputs for the EBC output prefix, inspects attached video encoders, matches the current portrait canvas/compatible portrait ratio and chooses the highest-resolution matching track.
