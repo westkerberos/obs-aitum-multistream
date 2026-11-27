@@ -5,9 +5,9 @@
 
 ## Scope and matched companion
 
-This branch provides Main Canvas destination orchestration, Twitch EBC and the TikTok configuration bridge. It must be paired with [WEST Vertical Canvas 1.6.8](https://github.com/westkerberos/obs-vertical-canvas/tree/release/obs33.0.3-vertical-1.6.8-west-stack-20261127), which owns vertical outputs, the EBC portrait video-encoder reuse and the TikTok runtime/Dual LIVE.
+The merged main branch provides Main Canvas destination orchestration, Twitch EBC and the TikTok configuration bridge. It must be paired with [WEST Vertical Canvas 1.6.8](https://github.com/westkerberos/obs-vertical-canvas/tree/main), which owns vertical outputs, the EBC portrait video-encoder reuse and the TikTok runtime/Dual LIVE.
 
-The end-to-end ownership map, encoder routes and paired test matrix are maintained in the [WEST Gaming Streaming Stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/release/obs33.0.3-vertical-1.6.8-west-stack-20261127/docs/WEST-GAMING-STREAMING-STACK.md).
+The end-to-end ownership map, encoder routes and paired test matrix are maintained in the [WEST Gaming Streaming Stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/WEST-GAMING-STREAMING-STACK.md).
 
 ## Build configuration and upstream integration
 
@@ -20,10 +20,10 @@ The end-to-end ownership map, encoder routes and paired test matrix are maintain
 
 Do not replace this fork with the official Aitum binary; it does not include the WEST EBC implementation and TikTok bridge. Do not overwrite the OBS 33.0.3 buildspec with upstream's older dependency pins.
 
-## Latest Windows x64 CI
+## Latest merged Windows x64 CI
 
-- Workflow: [#45899264700](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/45899264700)
-- Branch: feature/aitum-twitch-enhanced-broadcasting
+- Workflow: [#46035894193](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/46035894193)
+- Branch: main
 - Commit: 6a5578990456c9c55403ea9cdc51d18d3af3d5b1
 - Result: **success** (Windows x64 build/package).
 - Artifact: aitum-multistream-1.0.10-windows-x64-6a5578990.
