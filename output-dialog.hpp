@@ -55,13 +55,24 @@ private:
 
 	QStackedWidget *stackedWidget;
 	QStringList otherNames;
+	bool verticalCanvasTarget = false;
+	bool tiktokTarget = false;
+	bool twitchEnhancedBroadcasting = false;
+	obs_data_t *tiktokSettings = nullptr;
+
+	bool ConfigureVerticalTikTok(QWidget *parent);
+	QWidget *WizardInfoVerticalTikTok(bool edit = false);
 
 public:
-	OutputDialog(QDialog *parent, QStringList otherNames);
-	OutputDialog(QDialog *parent, QString name, QString server, QString key, QStringList otherNames);
+	OutputDialog(QDialog *parent, QStringList otherNames, bool verticalCanvasTarget = false);
+	OutputDialog(QDialog *parent, QString name, QString server, QString key, QStringList otherNames,
+		     bool verticalCanvasTarget = false, obs_data_t *settings = nullptr);
 	~OutputDialog();
 
 	QString outputName;
 	QString outputServer;
 	QString outputKey;
+	bool IsVerticalTikTokTarget() const { return verticalCanvasTarget && tiktokTarget; }
+	bool TwitchEnhancedBroadcastingEnabled() const { return twitchEnhancedBroadcasting; }
+	obs_data_t *TikTokSettings() const { return tiktokSettings; }
 };

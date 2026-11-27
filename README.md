@@ -1,43 +1,59 @@
 # WEST Gaming Aitum Multistream for OBS Studio
 
-A WEST Gaming-maintained fork of [Aitum Multistream](https://github.com/Aitum/obs-aitum-multistream). The project adds a TikTok destination to the **Vertical Canvas** output workflow through a small configuration bridge.
+A WEST Gaming-maintained fork of [Aitum Multistream](https://github.com/Aitum/obs-aitum-multistream). This repository owns the Main Canvas destination workflow and Twitch Enhanced Broadcasting (EBC), and provides the Vertical Canvas destination/TikTok configuration bridge.
 
-**Status: experimental development — no stable WEST Gaming release is published.**
+**Current target — 27 November 2026:** OBS Studio 33.0.3 · Aitum Multistream 1.0.10 · Windows x64.
 
-The TikTok destination work is in [Pull Request #1](https://github.com/westkerberos/obs-aitum-multistream/pull/1), branch `feature/tiktok-vertical-target`. The branch builds for Windows x64. It must be paired with the matching [WEST Gaming Vertical Canvas fork](https://github.com/westkerberos/obs-vertical-canvas), which owns the TikTok dialog and runtime.
+## Component ownership
 
-## What this fork adds
+This repository owns:
+- Main Canvas destinations and their normal Aitum output lifecycle.
+- Twitch Enhanced Broadcasting negotiation, track/encoder creation and the Twitch EBC output lifecycle.
+- The Vertical Canvas destination list, configuration handoff and start/stop controls.
+- A thin TikTok destination wizard bridge.
 
-- TikTok as a selectable destination under **Vertical Canvas → Add Output**.
-- A settings handoff to Vertical Canvas through the OBS proc-handler bridge `aitum_vertical_configure_tiktok_output`.
-- Saved destination settings that can be restored when a TikTok destination is edited.
-- The existing Multistream dock remains responsible for displaying and starting/stopping the destination.
+The matching [WEST Gaming Vertical Canvas fork](https://github.com/westkerberos/obs-vertical-canvas) owns:
+- Vertical scenes/canvas and vertical destinations (YouTube, Instagram, TikTok).
+- Reuse of Twitch EBC's portrait video encoder by opted-in vertical targets.
+- TikTok account/session, cookies/QR, signing, dynamic ingest, LIVE metadata/safety and Dual LIVE runtime.
 
-This repository is **not** a standalone TikTok implementation. It does not own TikTok cookies, session creation, request signing, RTMP ingest, safety monitoring or Dual LIVE. Those are the responsibility of the companion Vertical Canvas integration.
+Do not implement a second TikTok session/signing path in Multistream. Do not treat either plugin as a standalone update; build/install/test the pair together.
 
-## Required companion
+## Current update candidate
 
-Install compatible builds of both plugins when a release is available:
+- This repository: [feature/aitum-twitch-enhanced-broadcasting](https://github.com/westkerberos/obs-aitum-multistream/tree/feature/aitum-twitch-enhanced-broadcasting), Aitum Multistream **1.0.10**, OBS 33.0.3 build configuration.
+- Windows x64 CI: [#45899264700](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/45899264700) succeeded at commit 6a5578990456c9c55403ea9cdc51d18d3af3d5b1.
+- Artifact: aitum-multistream-1.0.10-windows-x64-6a5578990.
+- Required companion: [WEST Vertical Canvas 1.6.8 integration branch](https://github.com/westkerberos/obs-vertical-canvas/tree/release/obs33.0.3-vertical-1.6.8-west-stack-20261127), Windows x64 CI [#46034312506](https://github.com/westkerberos/obs-vertical-canvas/actions/runs/46034312506).
 
-1. [WEST Gaming Aitum Multistream](https://github.com/westkerberos/obs-aitum-multistream) — this bridge.
-2. [WEST Gaming Vertical Canvas](https://github.com/westkerberos/obs-vertical-canvas) — TikTok configuration and runtime.
+The end-to-end architecture, version matrix, test evidence and operator start order are maintained in the [WEST Gaming Streaming Stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/release/obs33.0.3-vertical-1.6.8-west-stack-20261127/docs/WEST-GAMING-STREAMING-STACK.md). The reusable update checklist is [here](https://github.com/westkerberos/obs-vertical-canvas/blob/release/obs33.0.3-vertical-1.6.8-west-stack-20261127/docs/UPDATE-PROCEDURE.md).
 
-The original OBS Multi-RTMP plugin is not required to be enabled for this integration.
+## Operator start order
 
-## Release and compatibility status
+1. Start Twitch EBC and wait for the EBC tracks to initialize.
+2. Start YouTube Vertical.
+3. Start YouTube Horizontal/Main Canvas.
+4. Start Instagram Vertical.
+5. Start TikTok Dual LIVE.
 
-There is no stable GitHub Release or supported installer for this fork yet. The default `main` branch does not contain the TikTok bridge until PR #1 is merged. Do not install this repository by itself expecting a working TikTok destination.
+Twitch EBC supplies the portrait video encoder reused by opted-in Vertical Canvas targets. TikTok Landscape separately needs an active OBS Main Canvas streaming output. Twitch being active alone does not satisfy that prerequisite; Vertical Canvas displays a missing-prerequisite warning.
 
-The companion Vertical Canvas development branch has unresolved licensing/provenance remediation. A green Multistream build does not clear or validate the companion TikTok runtime. No combined release should be published until the companion's source audit, architecture, packaging and runtime tests are complete.
+## Upstream Aitum 1.0.10 changes integrated
 
-## Development links
+The WEST fork contains both relevant official Aitum 1.0.10 changes:
+- Reload Vertical Canvas destinations after OBS finishes loading.
+- Use the OBS 33 ProgramData plugin installer layout.
 
-- [TikTok target setup and troubleshooting](https://github.com/westkerberos/obs-aitum-multistream/blob/feature/tiktok-vertical-target/docs/TIKTOK-TARGET.md)
-- [Fork differences and bridge ownership](https://github.com/westkerberos/obs-aitum-multistream/blob/feature/tiktok-vertical-target/docs/FORK-DIFFERENCES.md)
-- [Build and testing status](https://github.com/westkerberos/obs-aitum-multistream/blob/feature/tiktok-vertical-target/docs/BUILD-AND-TESTING.md)
-- [Matching Vertical Canvas TikTok guide](https://github.com/westkerberos/obs-vertical-canvas/blob/feature/tiktok-native-output/docs/TIKTOK-LIVE.md)
-- [Upstream Aitum Multistream](https://github.com/Aitum/obs-aitum-multistream)
+The fork retains WEST's EBC implementation and TikTok bridge. Do not replace this fork with the official Aitum 1.0.10 DLL.
 
-## Search terms
+## Documentation
 
-OBS Studio plugin, Aitum Multistream, TikTok LIVE, TikTok destination, Vertical Canvas, OBS multi-streaming, RTMP, WEST Gaming.
+- [EBC and complete stack integration](docs/TWITCH-EBC-AND-STACK-INTEGRATION.md)
+- [TikTok target bridge](docs/TIKTOK-TARGET.md)
+- [Fork differences](docs/FORK-DIFFERENCES.md)
+- [Build and paired test status](docs/BUILD-AND-TESTING.md)
+- [WEST full-stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/release/obs33.0.3-vertical-1.6.8-west-stack-20261127/docs/WEST-GAMING-STREAMING-STACK.md)
+
+## Distribution status
+
+This is a development/integration fork, not a stable public WEST Gaming release. The TikTok-native implementation in the companion Vertical Canvas repository still has unresolved source-license/provenance questions. Do not publish a combined binary or claim license clearance until those issues are remediated or independently cleared. This is not legal advice.
