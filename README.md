@@ -52,6 +52,7 @@ The fork retains WEST's EBC implementation and TikTok bridge. Do not replace thi
 - [Fork differences](docs/FORK-DIFFERENCES.md)
 - [Build and paired test status](docs/BUILD-AND-TESTING.md)
 - [WEST full-stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/WEST-GAMING-STREAMING-STACK.md)
+- [Next-chat handoff and exact current stack manifest](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/NEW-CHAT-START-HERE.md)
 
 ## Distribution status
 
