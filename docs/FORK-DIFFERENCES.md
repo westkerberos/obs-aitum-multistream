@@ -1,73 +1,46 @@
-# WEST Gaming fork differences
+# WEST Gaming Aitum Multistream — fork differences
+
+**Status date:** 27 November 2026  
+**Current branch:** feature/aitum-twitch-enhanced-broadcasting · Aitum Multistream 1.0.10 · OBS 33.0.3
 
 ## Upstream project
 
-This repository is based on [Aitum/obs-aitum-multistream](https://github.com/Aitum/obs-aitum-multistream). The fork retains the upstream Multistream dock and target-management workflow.
+This repository is based on [Aitum/obs-aitum-multistream](https://github.com/Aitum/obs-aitum-multistream). The WEST fork retains its Main Canvas dock/output workflow and adds Twitch EBC plus a Vertical Canvas bridge.
 
 ## WEST Gaming additions
 
-The TikTok destination integration is in [PR #1](https://github.com/westkerberos/obs-aitum-multistream/pull/2), branch `feature/aitum-twitch-enhanced-broadcasting`.
+### Twitch Enhanced Broadcasting
 
-### Output wizard changes
+- Requests Twitch track configuration and negotiates encoder tracks for Main Canvas and, when available, the Vertical Canvas portrait canvas.
+- Creates a separate EBC-managed Twitch RTMP output and retains its encoder-group/canvas references through output lifetime.
+- Publishes output under the name prefix aitum_multi_ebc_output_ so the companion Vertical Canvas plugin can discover the active EBC output.
+- Keeps track/encoder setup and cleanup inside Multistream; Vertical Canvas does not negotiate a second Twitch EBC session.
 
-- The output dialog receives context indicating whether the destination is for the Vertical Canvas path.
-- TikTok is selectable in the Vertical Canvas output wizard.
-- TikTok targets are marked with `tiktok_target` and retain provider-specific configuration fields.
-- Creating/editing a native TikTok target opens the configuration dialog exposed by Vertical Canvas.
-- Dynamic TikTok methods do not require the user to paste a real server/key into the wizard; those values are acquired at output startup by Vertical Canvas.
-- Custom RTMP continues to use the ordinary manual server/key fields.
+### TikTok target bridge
 
-### Bridge contract
+- TikTok is selectable in the Vertical Canvas destination workflow.
+- Provider-specific settings are persisted with the target.
+- Multistream calls aitum_vertical_configure_tiktok_output to open/save the Vertical Canvas TikTok configuration dialog.
+- The actual session, authentication, signing, endpoints, media output and Dual LIVE remain in Vertical Canvas.
 
-Multistream calls the OBS proc-handler function:
+### Vertical output reload
 
-```text
-aitum_vertical_configure_tiktok_output
-```
+After OBS fires OBS_FRONTEND_EVENT_FINISHED_LOADING, Multistream loads its settings and then calls LoadVerticalOutputs(false) so the Vertical Canvas target list is refreshed after OBS startup.
 
-The call passes a parent widget, an OBS settings object and destination name; Vertical Canvas returns whether the dialog was accepted. If the handler is missing, Multistream reports that Vertical Canvas is unavailable or outdated.
+## Scope retained from upstream
 
-The bridge is intentionally thin. It does not add:
-- TikTok API requests or hosted signing.
-- TikTok account/device/QR login code.
-- LIVE creation, heartbeat or cleanup.
-- LIVE violation monitoring or appeals.
-- Portrait/landscape encoder creation or the second Dual LIVE transport.
+- Main Canvas output creation/edit and ordinary RTMP destinations remain on the upstream Aitum path.
+- The existing Multistream dock remains responsible for destination presentation and start/stop action.
+- TikTok is not a second provider runtime inside this repository.
 
-Those capabilities belong to the matching Vertical Canvas fork.
+## Upstream Aitum 1.0.10 port
 
-### Scope retained from upstream
-
-- The existing Main Canvas output creation/edit path remains on the upstream flow.
-- Other platform targets continue to use the normal output wizard and service fields.
-- The existing Multistream dock remains responsible for presenting targets and handling the user's start/stop action.
-
-## Source files changed by the bridge PR
-
-The PR touches the following areas:
-
-- `.github/workflows/*.yaml`: this fork's Windows-only CI dispatch.
-- `config-dialog.cpp`: Vertical Canvas destination creation/edit stores TikTok-specific settings with the target.
-- `output-dialog.cpp` and `output-dialog.hpp`: provider selection, edit-mode restore, configuration button and proc-handler bridge call.
-- `multistream.cpp`: TikTok target identity/icon handling in the vertical output dock.
-
-The TikTok session, UI, output and safety code is intentionally not copied into this repository.
-
-## Exact upstream scope
-
-The fork is based on [Aitum/obs-aitum-multistream](https://github.com/Aitum/obs-aitum-multistream). The exact file/addition/deletion totals change as the PR is updated. Use the live [PR #1 Files view](https://github.com/westkerberos/obs-aitum-multistream/pull/1/files) for current totals.
-
-The source-code additions are intentionally small compared with the Vertical Canvas TikTok implementation. The key changes are the Vertical Canvas-aware target creation/edit path in `config-dialog.cpp`, TikTok wizard and proc-handler bridge in `output-dialog.cpp/.hpp`, and TikTok target identification in `multistream.cpp`, plus Windows-only workflow configuration and this documentation.
-
-A comparison against Aitum's upstream `main` shows the feature branch ahead and not behind. The exact ahead count includes inherited branch history and changes as documentation commits are added; the PR file list is the more useful measure of the actual Multistream bridge change.
-
-
-For the complete Twitch EBC + portrait encoder reuse + native TikTok design and current compatibility matrix, see the [WEST Gaming Streaming Stack — Source of Truth](https://github.com/westkerberos/obs-vertical-canvas/blob/feature/tiktok-native-ebc-combined/docs/WEST-GAMING-STREAMING-STACK.md) and [Twitch EBC and stack integration](TWITCH-EBC-AND-STACK-INTEGRATION.md).
+- Commit 64ef323 adds the post-load Vertical Canvas destination refresh.
+- Commit 41329c5 bumps version/manifest to 1.0.10 and adds the OBS 33 ProgramData Windows installer layout.
+- WEST buildspec remains pinned to OBS 33.0.3 and 2026-10-23 deps/Qt; do not replace with upstream's older dependency baseline.
 
 ## Build and test status
 
-The latest verified Windows x64 bridge build and artifact are recorded in [Build and verification](BUILD-AND-TESTING.md).
+Windows x64 CI [#45899264700](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/45899264700) passed at commit 6a5578990456c9c55403ea9cdc51d18d3af3d5b1. The 27 Nov user log shows Twitch EBC track creation and the paired TikTok feeds working with the previous Vertical Canvas 1.6.7 build. The exact companion 1.6.8 runtime test and longer soak remain pending.
 
-A separate successful Multistream build is not proof of the Vertical Canvas runtime. The latter must be installed and tested as a paired component. The matching Vertical Canvas PR and current runtime/build notes are linked from the [main README](../README.md).
-
-This repository has no GitHub Release as of 18 November 2026. The feature branch must be merged and a release package created before the integration can be presented as a stable public release.
+See the [WEST Gaming full-stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/release/obs33.0.3-vertical-1.6.8-west-stack-20261127/docs/WEST-GAMING-STREAMING-STACK.md).
