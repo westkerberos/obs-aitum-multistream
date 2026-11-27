@@ -14,6 +14,7 @@
 #include <QVBoxLayout>
 #include <util/config-file.h>
 #include <util/platform.h>
+#include <chrono>
 
 extern "C" {
 #include "file-updater.h"
@@ -24,6 +25,10 @@ OBS_MODULE_AUTHOR("Aitum");
 OBS_MODULE_USE_DEFAULT_LOCALE("aitum-multistream", "en-US")
 
 static MultistreamDock *multistream_dock = nullptr;
+
+// Keep EBC canvases alive if OBS has not fully stopped an output by shutdown.
+// Deliberately process-lifetime storage avoids destroying a canvas still used by an encoder.
+static auto *shutdown_canvas_leases = new std::vector<std::shared_ptr<obs_canvas_t>>();
 
 update_info_t *version_update_info = nullptr;
 
@@ -504,6 +509,8 @@ MultistreamDock::~MultistreamDock()
 		vendor = nullptr;
 	}
 	videoCheckTimer.stop();
+	std::vector<obs_output_t *> outputs_to_wait;
+	std::vector<std::pair<obs_output_t *, obs_service_t *>> outputs_to_release;
 	for (auto it = outputs.begin(); it != outputs.end(); it++) {
 		auto old = std::get<obs_output_t *>(*it);
 		signal_handler_t *signal = obs_output_get_signal_handler(old);
@@ -511,10 +518,53 @@ MultistreamDock::~MultistreamDock()
 		signal_handler_disconnect(signal, "stop", stream_output_stop, this);
 		auto service = obs_output_get_service(old);
 		if (obs_output_active(old)) {
+			blog(LOG_INFO, "[Aitum Multistream] Waiting for output '%s' to stop before releasing its EBC resources",
+			     obs_output_get_name(old) ? obs_output_get_name(old) : "(unknown)");
 			obs_output_force_stop(old);
+			outputs_to_wait.push_back(old);
 		}
-		if (!exiting) {
-			obs_output_release(old);
+		if (!exiting)
+			outputs_to_release.emplace_back(old, service);
+	}
+
+	// Twitch EBC encoders consume the Aitum Vertical canvas directly. Stopping
+	// an output is asynchronous: its encoder stop callback releases the video
+	// context later. Do not let enhanced_encoder_canvases release that canvas
+	// until every output has completed that callback.
+	const auto stop_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+	bool outputs_stopped = false;
+	for (;;) {
+		outputs_stopped = true;
+		for (auto *output : outputs_to_wait) {
+			if (obs_output_active(output)) {
+				outputs_stopped = false;
+				break;
+			}
+		}
+		if (outputs_stopped || std::chrono::steady_clock::now() >= stop_deadline)
+			break;
+		os_sleep_ms(10);
+	}
+
+	if (!outputs_stopped) {
+		blog(LOG_ERROR,
+		     "[Aitum Multistream] An output remained active after 20 seconds; preserving its canvas leases until process exit to avoid freeing video still in use");
+		for (auto &entry : enhanced_encoder_canvases) {
+			if (entry.second)
+				shutdown_canvas_leases->push_back(std::move(entry.second));
+		}
+		enhanced_encoder_canvases.clear();
+	} else if (!outputs_to_wait.empty()) {
+		blog(LOG_INFO, "[Aitum Multistream] All output encoders stopped; EBC canvas leases can now be released safely");
+	}
+
+	if (!exiting) {
+		for (const auto &[output, service] : outputs_to_release) {
+			if (obs_output_active(output)) {
+				// Keep output and service references alive if stop did not complete.
+				continue;
+			}
+			obs_output_release(output);
 			obs_service_release(service);
 		}
 	}
