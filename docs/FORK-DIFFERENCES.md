@@ -1,7 +1,7 @@
 # WEST Gaming Aitum Multistream — fork differences
 
 **Status date:** 27 November 2026  
-**Current branch:** feature/aitum-twitch-enhanced-broadcasting · Aitum Multistream 1.0.10 · OBS 33.0.3
+**Current branch:** main · Aitum Multistream 1.0.10 · OBS 33.0.3
 
 ## Upstream project
 
@@ -43,4 +43,4 @@ After OBS fires OBS_FRONTEND_EVENT_FINISHED_LOADING, Multistream loads its setti
 
 Windows x64 CI [#45899264700](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/45899264700) passed at commit 6a5578990456c9c55403ea9cdc51d18d3af3d5b1. The 27 Nov user log shows Twitch EBC track creation and the paired TikTok feeds working with the previous Vertical Canvas 1.6.7 build. The exact companion 1.6.8 runtime test and longer soak remain pending.
 
-See the [WEST Gaming full-stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/release/obs33.0.3-vertical-1.6.8-west-stack-20261127/docs/WEST-GAMING-STREAMING-STACK.md).
+See the [WEST Gaming full-stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/WEST-GAMING-STREAMING-STACK.md).
