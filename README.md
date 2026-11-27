@@ -22,7 +22,7 @@ Do not implement a second TikTok session/signing path in Multistream. Do not tre
 ## Current merged integration
 
 - This repository: Aitum Multistream **1.0.10**, merged into `main` via [PR #2](https://github.com/westkerberos/obs-aitum-multistream/pull/2), merge commit `6d4c0922f60ddd0012778c69dc7584a0cef55d15`. The latest documentation head is recorded in the source-of-truth.
-- Windows x64 CI for merged integration: [#46035894193](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/46035894193) succeeded; artifact `aitum-multistream-1.0.10-windows-x64-3c582ebb5`.
+- Post-merge Windows x64 CI on `main`: [#46036486335](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/46036486335) succeeded; artifact `aitum-multistream-1.0.10-windows-x64-6d4c0922f`.
 - Required companion: [WEST Vertical Canvas 1.6.8 integration branch](https://github.com/westkerberos/obs-vertical-canvas/tree/main), Windows x64 CI [#46034312506](https://github.com/westkerberos/obs-vertical-canvas/actions/runs/46034312506).
 
 The end-to-end architecture, version matrix, test evidence and operator start order are maintained in the [WEST Gaming Streaming Stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/WEST-GAMING-STREAMING-STACK.md). The reusable update checklist is [here](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/UPDATE-PROCEDURE.md).
