@@ -2,7 +2,7 @@
 
 **Status date:** 27 November 2026  
 **Current source:** main · Aitum Multistream 1.0.10 · OBS 33.0.3  
-**Windows x64 CI:** [#46035894193](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/46035894193) — success
+**Windows x64 CI:** [#46036486335](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/46036486335) — success
 
 Maintain this repository together with the matching [WEST Vertical Canvas 1.6.8 update branch](https://github.com/westkerberos/obs-vertical-canvas/tree/main). The end-to-end architecture and test sequence live in the [WEST Gaming Streaming Stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/WEST-GAMING-STREAMING-STACK.md).
 
@@ -63,7 +63,7 @@ Twitch being active alone is not enough for TikTok Landscape. Main Canvas being 
 
 ## Verification and maintenance
 
-Compile/package success for the merged WEST integration is established by Windows CI [#46035894193](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/46035894193). The 27 Nov 13:01 log shows EBC track creation and TikTok Dual LIVE working with the previous Vertical Canvas 1.6.7 pair. Exact 1.6.8 paired runtime validation, multi-destination soak, disconnect/reconnect and the complete test matrix remain in [Build and verification](BUILD-AND-TESTING.md).
+Compile/package success for the merged WEST integration is established by post-merge Windows CI [#46036486335](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/46036486335). The 27 Nov 13:01 log shows EBC track creation and TikTok Dual LIVE working with the previous Vertical Canvas 1.6.7 pair. Exact 1.6.8 paired runtime validation, multi-destination soak, disconnect/reconnect and the complete test matrix remain in [Build and verification](BUILD-AND-TESTING.md).
 
 See [the full update procedure](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/UPDATE-PROCEDURE.md). Keep output names, reserved encoder marker, proc-handler API names, settings keys and encoder lifetimes synchronized across both repositories.
 
