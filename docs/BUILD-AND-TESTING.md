@@ -24,9 +24,10 @@ Do not replace this fork with the official Aitum binary; it does not include the
 
 - Workflow: [#46035894193](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/46035894193)
 - Branch: main
-- Commit: 6a5578990456c9c55403ea9cdc51d18d3af3d5b1
+- Source head tested: `4b1ef9ec1ca3bba92222c3c5f82e2dfeb830d615`.
+- Merged main integration commit: `6d4c0922f60ddd0012778c69dc7584a0cef55d15`.
 - Result: **success** (Windows x64 build/package).
-- Artifact: aitum-multistream-1.0.10-windows-x64-6a5578990.
+- Artifact: `aitum-multistream-1.0.10-windows-x64-3c582ebb5`.
 - Ubuntu/macOS and formatting: skipped by the current Windows-only workflow.
 
 This establishes compilation/packaging against OBS 33.0.3 sources. It does not by itself prove Twitch EBC negotiation, track assignment, OBS encoder identity/reuse, TikTok session startup or long-duration stability.
