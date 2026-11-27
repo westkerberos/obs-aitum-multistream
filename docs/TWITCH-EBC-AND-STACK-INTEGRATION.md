@@ -1,10 +1,10 @@
 # WEST Gaming Aitum Multistream — EBC and stack integration
 
 **Status date:** 27 November 2026  
-**Current source:** feature/aitum-twitch-enhanced-broadcasting · Aitum Multistream 1.0.10 · OBS 33.0.3  
-**Windows x64 CI:** [#45899264700](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/45899264700) — success
+**Current source:** main · Aitum Multistream 1.0.10 · OBS 33.0.3  
+**Windows x64 CI:** [#46035894193](https://github.com/westkerberos/obs-aitum-multistream/actions/runs/46035894193) — success
 
-Maintain this repository together with the matching [WEST Vertical Canvas 1.6.8 update branch](https://github.com/westkerberos/obs-vertical-canvas/tree/release/obs33.0.3-vertical-1.6.8-west-stack-20261127). The end-to-end architecture and test sequence live in the [WEST Gaming Streaming Stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/release/obs33.0.3-vertical-1.6.8-west-stack-20261127/docs/WEST-GAMING-STREAMING-STACK.md).
+Maintain this repository together with the matching [WEST Vertical Canvas 1.6.8 update branch](https://github.com/westkerberos/obs-vertical-canvas/tree/main). The end-to-end architecture and test sequence live in the [WEST Gaming Streaming Stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/WEST-GAMING-STREAMING-STACK.md).
 
 ## Responsibilities
 
@@ -65,7 +65,7 @@ Twitch being active alone is not enough for TikTok Landscape. Main Canvas being 
 
 Compile/package success is established by Windows CI #45899264700. The 27 Nov 13:01 log shows EBC track creation and TikTok Dual LIVE working with the previous Vertical Canvas 1.6.7 pair. Exact 1.6.8 paired runtime validation, multi-destination soak, disconnect/reconnect and the complete test matrix remain in [Build and verification](BUILD-AND-TESTING.md).
 
-See [the full update procedure](https://github.com/westkerberos/obs-vertical-canvas/blob/release/obs33.0.3-vertical-1.6.8-west-stack-20261127/docs/UPDATE-PROCEDURE.md). Keep output names, reserved encoder marker, proc-handler API names, settings keys and encoder lifetimes synchronized across both repositories.
+See [the full update procedure](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/UPDATE-PROCEDURE.md). Keep output names, reserved encoder marker, proc-handler API names, settings keys and encoder lifetimes synchronized across both repositories.
 
 ## License and release status
 
