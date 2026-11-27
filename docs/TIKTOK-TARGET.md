@@ -2,7 +2,7 @@
 
 This document describes the TikTok destination bridge in WEST Gaming's Aitum Multistream 1.0.10 fork. The actual TikTok connection/runtime is owned by the matching WEST Gaming Vertical Canvas 1.6.8 integration.
 
-See the [WEST Gaming full-stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/release/obs33.0.3-vertical-1.6.8-west-stack-20261127/docs/WEST-GAMING-STREAMING-STACK.md) for component ownership, version matrix, encoder routing, the recommended start order and test matrix.
+See the [WEST Gaming full-stack source of truth](https://github.com/westkerberos/obs-vertical-canvas/blob/main/docs/WEST-GAMING-STREAMING-STACK.md) for component ownership, version matrix, encoder routing, the recommended start order and test matrix.
 
 ## Component ownership
 
