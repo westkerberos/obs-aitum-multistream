@@ -1086,22 +1086,69 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 	}
 
 	const char *name = obs_data_get_string(settings, "name");
+	const bool creating_ebc = obs_data_get_bool(settings, "twitch_enhanced_broadcasting");
+	if (creating_ebc) {
+		PollDeferredEbcResources();
+		if (!deferred_ebc_resources->empty()) {
+			QMessageBox::warning(
+				this, QStringLiteral("Twitch Enhanced Broadcasting"),
+				QStringLiteral("Un grupo de encoders EBC anterior todavía está siendo utilizado por una salida vertical. Detené primero las salidas verticales y volvé a iniciar Twitch."));
+			return false;
+		}
+	}
+
 	for (auto it = outputs.begin(); it != outputs.end(); it++) {
 		if (std::get<std::string>(*it) != name) {
 			continue;
 		}
+		const std::string old_settings_name = std::get<std::string>(*it);
 		auto old = std::get<obs_output_t *>(*it);
 		signal_handler_t *signal = obs_output_get_signal_handler(old);
 		signal_handler_disconnect(signal, "start", stream_output_start, this);
 		signal_handler_disconnect(signal, "stop", stream_output_stop, this);
+
+		auto group_it = enhanced_encoder_groups.find(old_settings_name);
+		if (group_it != enhanced_encoder_groups.end()) {
+			DeferredEbcResources resources;
+			resources.output = old;
+			CaptureEbcEncoders(resources, old);
+			resources.group = std::move(group_it->second);
+			enhanced_encoder_groups.erase(group_it);
+			auto canvas_it = enhanced_encoder_canvases.find(old_settings_name);
+			if (canvas_it != enhanced_encoder_canvases.end()) {
+				resources.canvas = std::move(canvas_it->second);
+				enhanced_encoder_canvases.erase(canvas_it);
+			}
+			if (obs_output_active(old))
+				obs_output_force_stop(old);
+
+			outputs.erase(it);
+			if (TryReleaseEbcResources(resources))
+				break;
+
+			deferred_ebc_resources->push_back(std::move(resources));
+			ScheduleDeferredEbcPoll(this);
+			QMessageBox::information(
+				this, QStringLiteral("Twitch Enhanced Broadcasting"),
+				QStringLiteral("El output EBC anterior se está deteniendo, pero sus encoders todavía están siendo utilizados por otra salida. Cuando terminen de detenerse, iniciá Twitch nuevamente."));
+			return false;
+		}
+
 		auto service = obs_output_get_service(old);
 		if (obs_output_active(old)) {
 			obs_output_force_stop(old);
+			// Stop is asynchronous. Keep both borrowed/owned resources alive and
+			// ask the user to retry after the old output has completely stopped.
+			shutdown_output_resources->emplace_back(old, service);
+			outputs.erase(it);
+			QMessageBox::information(
+				this, QStringLiteral("Aitum Multistream"),
+				QStringLiteral("La salida anterior todavía se está deteniendo. Volvé a iniciarla cuando OBS haya terminado de cerrarla."));
+			return false;
 		}
 		obs_output_release(old);
-		obs_service_release(service);
-		enhanced_encoder_groups.erase(std::get<std::string>(*it));
-		enhanced_encoder_canvases.erase(std::get<std::string>(*it));
+		if (service)
+			obs_service_release(service);
 		outputs.erase(it);
 		break;
 	}
