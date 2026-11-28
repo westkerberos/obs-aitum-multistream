@@ -39,6 +39,7 @@ struct DeferredEbcResources {
 // Intentionally process-lifetime containers: a timed-out OBS shutdown must
 // not run C++ destructors that release objects still referenced by worker threads.
 auto *deferred_ebc_resources = new std::vector<DeferredEbcResources>();
+auto *deferred_output_resources = new std::vector<std::pair<obs_output_t *, obs_service_t *>>();
 auto *shutdown_ebc_resources = new std::vector<DeferredEbcResources>();
 auto *shutdown_output_resources = new std::vector<std::pair<obs_output_t *, obs_service_t *>>();
 
@@ -98,15 +99,26 @@ static void PollDeferredEbcResources()
 		else
 			++it;
 	}
+	for (auto it = deferred_output_resources->begin(); it != deferred_output_resources->end();) {
+		if (it->first && obs_output_active(it->first)) {
+			++it;
+			continue;
+		}
+		if (it->first)
+			obs_output_release(it->first);
+		if (it->second)
+			obs_service_release(it->second);
+		it = deferred_output_resources->erase(it);
+	}
 }
 
 static void ScheduleDeferredEbcPoll(QObject *context)
 {
-	if (!context || deferred_ebc_resources->empty())
+	if (!context || (deferred_ebc_resources->empty() && deferred_output_resources->empty()))
 		return;
 	QTimer::singleShot(250, context, [context] {
 		PollDeferredEbcResources();
-		if (!deferred_ebc_resources->empty())
+		if (!deferred_ebc_resources->empty() || !deferred_output_resources->empty())
 			ScheduleDeferredEbcPoll(context);
 	});
 }
@@ -1140,7 +1152,8 @@ bool MultistreamDock::StartOutput(obs_data_t *settings, QPushButton *streamButto
 			obs_output_force_stop(old);
 			// Stop is asynchronous. Keep both borrowed/owned resources alive and
 			// ask the user to retry after the old output has completely stopped.
-			shutdown_output_resources->emplace_back(old, service);
+			deferred_output_resources->emplace_back(old, service);
+			ScheduleDeferredEbcPoll(this);
 			outputs.erase(it);
 			QMessageBox::information(
 				this, QStringLiteral("Aitum Multistream"),
@@ -1652,7 +1665,8 @@ void MultistreamDock::stream_output_stop(void *data, calldata_t *calldata)
 				shutdown_output_resources->emplace_back(output, obs_output_get_service(output));
 			} else if (obs_output_active(output)) {
 				// Unexpected for a stop callback, but never release an active output.
-				shutdown_output_resources->emplace_back(output, obs_output_get_service(output));
+				deferred_output_resources->emplace_back(output, obs_output_get_service(output));
+				ScheduleDeferredEbcPoll(md);
 			} else {
 				auto *service = obs_output_get_service(output);
 				obs_output_release(output);
