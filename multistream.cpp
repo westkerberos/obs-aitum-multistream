@@ -4,6 +4,7 @@
 #include "obs-module.h"
 #include "version.h"
 #include <obs-frontend-api.h>
+#include <obs-output.h>
 #include <QDesktopServices>
 #include <QGroupBox>
 #include <QLabel>
