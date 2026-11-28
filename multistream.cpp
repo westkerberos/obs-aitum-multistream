@@ -1575,51 +1575,95 @@ void MultistreamDock::stream_output_start(void *data, calldata_t *calldata)
 void MultistreamDock::stream_output_stop(void *data, calldata_t *calldata)
 {
 	auto md = (MultistreamDock *)data;
-	auto output = (obs_output_t *)calldata_ptr(calldata, "output");
-	if (md->vendor) {
-		auto d = obs_data_create();
-		auto name = obs_output_get_name(output);
-		if (name) {
-			obs_data_set_string(d, "name", name);
-		}
-		obs_websocket_vendor_emit_event(md->vendor, "output_stopped", d);
-		obs_data_release(d);
-	}
-	for (auto it = md->outputs.begin(); it != md->outputs.end(); it++) {
-		if (std::get<obs_output_t *>(*it) != output) {
-			continue;
-		}
-		auto button = std::get<QPushButton *>(*it);
-		if (button->isChecked()) {
-			QMetaObject::invokeMethod(
-				button,
-				[button, md] {
-					button->setChecked(false);
-					md->outputButtonStyle(button);
-				},
-				Qt::QueuedConnection);
-		}
-		const std::string output_settings_name = std::get<std::string>(*it);
-		const bool is_ebc = md->enhanced_encoder_groups.find(output_settings_name) != md->enhanced_encoder_groups.end();
-		if (!md->exiting) {
-			QMetaObject::invokeMethod(button, [output, md, output_settings_name, is_ebc] {
-				if (is_ebc)
-					ReleaseTwitchEnhancedBroadcastingOutput(output);
-				else
-					obs_output_release(output);
-				md->enhanced_encoder_groups.erase(output_settings_name);
-				md->enhanced_encoder_canvases.erase(output_settings_name);
-			}, Qt::QueuedConnection);
-		} else {
-			md->enhanced_encoder_groups.erase(output_settings_name);
-			md->enhanced_encoder_canvases.erase(output_settings_name);
-		}
-		md->outputs.erase(it);
-		break;
-	}
-	//const char *last_error = (const char *)calldata_ptr(calldata, "last_error");
-}
+	auto *raw_output = (obs_output_t *)calldata_ptr(calldata, "output");
+	if (!md || !raw_output)
+		return;
 
+	// OBS may emit this signal from an RTMP worker thread. Retain the output
+	// immediately, then do all dock/map/UI work on the Qt thread.
+	std::shared_ptr<obs_output_t> output_ref;
+	if (auto *reference = obs_output_get_ref(raw_output)) {
+		output_ref = std::shared_ptr<obs_output_t>(reference, [](obs_output_t *output) {
+			obs_output_release(output);
+		});
+	}
+	if (!output_ref)
+		return;
+
+	QMetaObject::invokeMethod(md, [md, output_ref] {
+		auto *output = output_ref.get();
+		if (md->vendor) {
+			auto d = obs_data_create();
+			auto name = obs_output_get_name(output);
+			if (name)
+				obs_data_set_string(d, "name", name);
+			obs_websocket_vendor_emit_event(md->vendor, "output_stopped", d);
+			obs_data_release(d);
+		}
+
+		for (auto it = md->outputs.begin(); it != md->outputs.end(); ++it) {
+			if (std::get<obs_output_t *>(*it) != output)
+				continue;
+
+			auto *button = std::get<QPushButton *>(*it);
+			if (button && button->isChecked()) {
+				button->setChecked(false);
+				md->outputButtonStyle(button);
+			}
+
+			const std::string output_settings_name = std::get<std::string>(*it);
+			auto group_it = md->enhanced_encoder_groups.find(output_settings_name);
+			const bool is_ebc = group_it != md->enhanced_encoder_groups.end();
+			if (is_ebc) {
+				DeferredEbcResources resources;
+				CaptureEbcEncoders(resources, output);
+				resources.group = std::move(group_it->second);
+				md->enhanced_encoder_groups.erase(group_it);
+
+				auto canvas_it = md->enhanced_encoder_canvases.find(output_settings_name);
+				if (canvas_it != md->enhanced_encoder_canvases.end()) {
+					resources.canvas = std::move(canvas_it->second);
+					md->enhanced_encoder_canvases.erase(canvas_it);
+				}
+
+				if (md->exiting) {
+					// Transfer the dock-owned output reference to process-lifetime
+					// storage; OBS itself is already shutting down.
+					resources.output = output;
+					shutdown_ebc_resources->push_back(std::move(resources));
+				} else {
+					// The stop signal normally means the RTMP output is inactive.
+					// If it is not, retain it together with its borrowed service.
+					if (obs_output_active(output)) {
+						resources.output = output;
+					} else {
+						ReleaseTwitchEnhancedBroadcastingOutput(output);
+					}
+
+					if (resources.output || EbcEncodersStillActive(resources)) {
+						deferred_ebc_resources->push_back(std::move(resources));
+						ScheduleDeferredEbcPoll(md);
+					} else {
+						TryReleaseEbcResources(resources);
+					}
+				}
+			} else if (md->exiting) {
+				shutdown_output_resources->emplace_back(output, obs_output_get_service(output));
+			} else if (obs_output_active(output)) {
+				// Unexpected for a stop callback, but never release an active output.
+				shutdown_output_resources->emplace_back(output, obs_output_get_service(output));
+			} else {
+				auto *service = obs_output_get_service(output);
+				obs_output_release(output);
+				if (service)
+					obs_service_release(service);
+			}
+
+			md->outputs.erase(it);
+			break;
+		}
+	}, Qt::QueuedConnection);
+}
 void MultistreamDock::ApiInfo(QString info)
 {
 	auto d = obs_data_create_from_json(info.toUtf8().constData());
