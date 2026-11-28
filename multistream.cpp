@@ -14,6 +14,8 @@
 #include <QVBoxLayout>
 #include <util/config-file.h>
 #include <util/platform.h>
+#include <vector>
+#include <utility>
 
 extern "C" {
 #include "file-updater.h"
@@ -24,6 +26,90 @@ OBS_MODULE_AUTHOR("Aitum");
 OBS_MODULE_USE_DEFAULT_LOCALE("aitum-multistream", "en-US")
 
 static MultistreamDock *multistream_dock = nullptr;
+
+namespace {
+struct DeferredEbcResources {
+	obs_output_t *output = nullptr;
+	std::vector<obs_encoder_t *> encoders;
+	TwitchEbcEncoderGroup group;
+	std::shared_ptr<obs_canvas_t> canvas;
+};
+
+// Intentionally process-lifetime containers: a timed-out OBS shutdown must
+// not run C++ destructors that release objects still referenced by worker threads.
+auto *deferred_ebc_resources = new std::vector<DeferredEbcResources>();
+auto *shutdown_ebc_resources = new std::vector<DeferredEbcResources>();
+auto *shutdown_output_resources = new std::vector<std::pair<obs_output_t *, obs_service_t *>>();
+
+static void CaptureEbcEncoders(DeferredEbcResources &resources, obs_output_t *output)
+{
+	if (!output)
+		return;
+	for (size_t i = 0; i < MAX_OUTPUT_VIDEO_ENCODERS; ++i) {
+		auto *borrowed = obs_output_get_video_encoder2(output, i);
+		if (!borrowed)
+			continue;
+		if (auto *reference = obs_encoder_get_ref(borrowed))
+			resources.encoders.push_back(reference);
+	}
+}
+
+static bool EbcEncodersStillActive(const DeferredEbcResources &resources)
+{
+	// If no encoder could be captured, we cannot prove the canvas is unused.
+	if (resources.encoders.empty())
+		return true;
+	for (auto *encoder : resources.encoders) {
+		if (encoder && obs_encoder_active(encoder))
+			return true;
+	}
+	return false;
+}
+
+static bool TryReleaseEbcResources(DeferredEbcResources &resources)
+{
+	if (resources.output && obs_output_active(resources.output))
+		return false;
+	if (EbcEncodersStillActive(resources))
+		return false;
+
+	if (resources.output) {
+		ReleaseTwitchEnhancedBroadcastingOutput(resources.output);
+		resources.output = nullptr;
+	}
+	// The group owns encoder references. Drop it while our explicit encoder
+	// refs and the canvas are still alive, then release those refs and canvas.
+	resources.group.reset();
+	for (auto *encoder : resources.encoders) {
+		if (encoder)
+			obs_encoder_release(encoder);
+	}
+	resources.encoders.clear();
+	resources.canvas.reset();
+	return true;
+}
+
+static void PollDeferredEbcResources()
+{
+	for (auto it = deferred_ebc_resources->begin(); it != deferred_ebc_resources->end();) {
+		if (TryReleaseEbcResources(*it))
+			it = deferred_ebc_resources->erase(it);
+		else
+			++it;
+	}
+}
+
+static void ScheduleDeferredEbcPoll(QObject *context)
+{
+	if (!context || deferred_ebc_resources->empty())
+		return;
+	QTimer::singleShot(250, context, [context] {
+		PollDeferredEbcResources();
+		if (!deferred_ebc_resources->empty())
+			ScheduleDeferredEbcPoll(context);
+	});
+}
+} // namespace
 
 update_info_t *version_update_info = nullptr;
 
