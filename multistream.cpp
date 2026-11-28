@@ -590,27 +590,136 @@ MultistreamDock::~MultistreamDock()
 		vendor = nullptr;
 	}
 	videoCheckTimer.stop();
-	for (auto it = outputs.begin(); it != outputs.end(); it++) {
-		auto old = std::get<obs_output_t *>(*it);
-		signal_handler_t *signal = obs_output_get_signal_handler(old);
+
+	std::vector<DeferredEbcResources> ebc_leases;
+	std::vector<std::pair<obs_output_t *, obs_service_t *>> other_outputs;
+	for (auto &entry : outputs) {
+		const std::string &settings_name = std::get<std::string>(entry);
+		auto *output = std::get<obs_output_t *>(entry);
+		if (!output)
+			continue;
+
+		signal_handler_t *signal = obs_output_get_signal_handler(output);
 		signal_handler_disconnect(signal, "start", stream_output_start, this);
 		signal_handler_disconnect(signal, "stop", stream_output_stop, this);
-		auto service = obs_output_get_service(old);
-		if (obs_output_active(old)) {
-			obs_output_force_stop(old);
+
+		auto group_it = enhanced_encoder_groups.find(settings_name);
+		if (group_it != enhanced_encoder_groups.end()) {
+			DeferredEbcResources resources;
+			resources.output = output; // transfer the output's owning reference
+			CaptureEbcEncoders(resources, output);
+			resources.group = std::move(group_it->second);
+			enhanced_encoder_groups.erase(group_it);
+
+			auto canvas_it = enhanced_encoder_canvases.find(settings_name);
+			if (canvas_it != enhanced_encoder_canvases.end()) {
+				resources.canvas = std::move(canvas_it->second);
+				enhanced_encoder_canvases.erase(canvas_it);
+			}
+			ebc_leases.push_back(std::move(resources));
+		} else {
+			other_outputs.emplace_back(output, obs_output_get_service(output));
 		}
-		if (!exiting) {
-			obs_output_release(old);
-			obs_service_release(service);
+
+		if (obs_output_active(output)) {
+			blog(LOG_INFO, "[Aitum Multistream] Stopping output '%s' before releasing its resources",
+			     obs_output_get_name(output) ? obs_output_get_name(output) : "(unknown)");
+			obs_output_force_stop(output);
 		}
 	}
+
+	// The EBC parent RTMP output can stop while one of its grouped video
+	// encoders is still consumed by a Vertical Canvas destination. Wait for
+	// both the outputs and every retained encoder, not just the parent output.
+	bool all_resources_stopped = false;
+	for (int wait = 0; wait < 2000; ++wait) {
+		all_resources_stopped = true;
+		for (const auto &resources : ebc_leases) {
+			if ((resources.output && obs_output_active(resources.output)) ||
+			    EbcEncodersStillActive(resources)) {
+				all_resources_stopped = false;
+				break;
+			}
+		}
+		if (all_resources_stopped) {
+			for (const auto &output : other_outputs) {
+				if (output.first && obs_output_active(output.first)) {
+					all_resources_stopped = false;
+					break;
+				}
+			}
+		}
+		if (all_resources_stopped)
+			break;
+		os_sleep_ms(10);
+	}
+
+	if (exiting) {
+		// OBS is already tearing down. Do not run plugin-owned OBS releases
+		// against contexts that may be entering libobs shutdown.
+		for (auto &resources : ebc_leases)
+			shutdown_ebc_resources->push_back(std::move(resources));
+		for (auto &output : other_outputs)
+			shutdown_output_resources->push_back(output);
+		for (auto &resources : *deferred_ebc_resources)
+			shutdown_ebc_resources->push_back(std::move(resources));
+		deferred_ebc_resources->clear();
+	} else if (all_resources_stopped) {
+		for (auto &resources : ebc_leases)
+			TryReleaseEbcResources(resources);
+		for (auto &output : other_outputs) {
+			if (output.first)
+				obs_output_release(output.first);
+			if (output.second)
+				obs_service_release(output.second);
+		}
+		PollDeferredEbcResources();
+	} else {
+		blog(LOG_ERROR,
+		     "[Aitum Multistream] An EBC output or grouped encoder remained active after 20 seconds; preserving its output, encoder group and canvas references until process exit");
+		for (auto &resources : ebc_leases)
+			shutdown_ebc_resources->push_back(std::move(resources));
+		for (auto &output : other_outputs) {
+			if (output.first && obs_output_active(output.first))
+				shutdown_output_resources->push_back(output);
+			else {
+				if (output.first)
+					obs_output_release(output.first);
+				if (output.second)
+					obs_service_release(output.second);
+			}
+		}
+		for (auto &resources : *deferred_ebc_resources)
+			shutdown_ebc_resources->push_back(std::move(resources));
+		deferred_ebc_resources->clear();
+	}
+
+	// Any orphaned map entry is retained conservatively: without its parent
+	// output we cannot prove that no encoder still references its canvas.
+	for (auto &entry : enhanced_encoder_groups) {
+		DeferredEbcResources resources;
+		resources.group = std::move(entry.second);
+		auto canvas_it = enhanced_encoder_canvases.find(entry.first);
+		if (canvas_it != enhanced_encoder_canvases.end()) {
+			resources.canvas = std::move(canvas_it->second);
+			enhanced_encoder_canvases.erase(canvas_it);
+		}
+		shutdown_ebc_resources->push_back(std::move(resources));
+	}
+	enhanced_encoder_groups.clear();
+	for (auto &entry : enhanced_encoder_canvases) {
+		DeferredEbcResources resources;
+		resources.canvas = std::move(entry.second);
+		shutdown_ebc_resources->push_back(std::move(resources));
+	}
+	enhanced_encoder_canvases.clear();
+
 	outputs.clear();
 	obs_data_array_release(vertical_outputs);
 	obs_data_release(current_config);
 	obs_frontend_remove_event_callback(frontend_event, this);
 	multistream_dock = nullptr;
 }
-
 void MultistreamDock::frontend_event(enum obs_frontend_event event, void *private_data)
 {
 	auto md = (MultistreamDock *)private_data;
